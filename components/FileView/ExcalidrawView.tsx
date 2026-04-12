@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import "@excalidraw/excalidraw/index.css";
 
 const Excalidraw = dynamic(
   async () => (await import("@excalidraw/excalidraw")).Excalidraw,
@@ -34,6 +35,8 @@ export default function ExcalidrawView({ rawContent, fileName }: Props) {
 
   try {
     data = parseExcalidrawData(rawContent, fileName);
+    // Auto-fit the diagram to the viewport on load
+    (data as Record<string, unknown>).scrollToContent = true;
   } catch (e) {
     parseError = e instanceof Error ? e.message : String(e);
   }
@@ -47,9 +50,15 @@ export default function ExcalidrawView({ rawContent, fileName }: Props) {
   }
 
   return (
-    <div style={{ height: "calc(100vh - 260px)", minHeight: "500px", border: "1px solid var(--color-grey-200)", borderRadius: "6px", overflow: "hidden" }}>
+    <div style={{
+      height: "calc(100vh - var(--nav-height) - 180px)",
+      minHeight: "400px",
+      border: "1px solid var(--color-grey-200)",
+      borderRadius: "6px",
+      overflow: "hidden",
+    }}>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <Excalidraw initialData={data as any} viewModeEnabled />
+      <Excalidraw initialData={data as any} viewModeEnabled zenModeEnabled />
     </div>
   );
 }
