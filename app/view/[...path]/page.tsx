@@ -61,6 +61,17 @@ export default async function ViewPage({ params }: Props) {
     const html = await renderMarkdown(raw, filePath);
     const headings = extractHeadings(html);
     content = <MarkdownView html={html} filePath={filePath} commentsEnabled={commentsEnabled} headings={headings} />;
+  } else if (ext === "json") {
+    const raw = rawBuffer.toString("utf-8");
+    let formatted: string;
+    try {
+      formatted = JSON.stringify(JSON.parse(raw), null, 2);
+    } catch {
+      formatted = raw;
+    }
+    const html = await renderMarkdown("```json\n" + formatted + "\n```", filePath);
+    showComments = false;
+    content = <MarkdownView html={html} filePath={filePath} commentsEnabled={false} />;
   } else if (ext === "csv") {
     const rows: Record<string, string>[] = parseCsv(rawBuffer.toString("utf-8"), {
       columns: true,
