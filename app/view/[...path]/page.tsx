@@ -9,7 +9,9 @@ import MarkdownView from "@/components/FileView/MarkdownView";
 import CsvView from "@/components/FileView/CsvView";
 import ImageView from "@/components/FileView/ImageView";
 import SubtitleView from "@/components/FileView/SubtitleView";
+import ExcalidrawView from "@/components/FileView/ExcalidrawView";
 import DownloadButton from "@/components/DownloadButton";
+import ExcalidrawPngButton from "@/components/ExcalidrawPngButton";
 import CommentPanel from "@/components/Comments/CommentPanel";
 
 type Props = { params: Promise<{ path: string[] }> };
@@ -36,15 +38,24 @@ export default async function ViewPage({ params }: Props) {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
   const fileName = filePath.split("/").pop() ?? filePath;
   const rawBuffer = Buffer.from(file.content, "base64");
+  const isExcalidraw =
+    fileName.endsWith(".excalidraw") ||
+    fileName.endsWith(".excalidraw.md") ||
+    fileName.endsWith(".excalidraw.json");
 
   const branchConfig = config.branches.find((b) => b.name === session.branchName);
   const commentsEnabled = branchConfig?.comments.enabled ?? false;
   let showComments = commentsEnabled;
   let hasRelativeImages = false;
 
+  let rawContentForClient: string | null = null;
   let content: React.ReactNode;
 
-  if (MD_EXTS.has(ext)) {
+  if (isExcalidraw) {
+    rawContentForClient = rawBuffer.toString("utf-8");
+    showComments = false;
+    content = <ExcalidrawView rawContent={rawContentForClient} fileName={fileName} />;
+  } else if (MD_EXTS.has(ext)) {
     const raw = rawBuffer.toString("utf-8");
     hasRelativeImages = /!\[[^\]]*\]\((?!https?:\/\/)(?!data:)[^\s)]+/.test(raw);
     const html = await renderMarkdown(raw, filePath);
@@ -131,6 +142,9 @@ export default async function ViewPage({ params }: Props) {
             )}
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <DownloadButton filePath={filePath} />
+              {isExcalidraw && rawContentForClient && (
+                <ExcalidrawPngButton rawContent={rawContentForClient} fileName={fileName} />
+              )}
               {hasRelativeImages && (
                 <DownloadButton filePath={filePath} withMedia />
               )}
