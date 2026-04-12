@@ -24,6 +24,34 @@ export function parseExcalidrawData(raw: string, fileName: string): Record<strin
   return JSON.parse(raw);
 }
 
+/**
+ * Files created on excalidraw.com store bound text elements (text inside
+ * containers) with x:0, y:0, width:0, height:0. The renderer uses these
+ * stored values directly, so the text ends up at canvas origin and is
+ * invisible. We fix this by copying the container's bounds onto each
+ * zero-dimension bound text element before handing the data to Excalidraw.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fixBoundTextPositions(data: Record<string, unknown>): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elements = (data.elements as any[]) ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elMap = new Map<string, any>(elements.map(e => [e.id, e]));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fixed = elements.map((el: any) => {
+    if (el.type === "text" && el.containerId && el.width === 0 && el.height === 0) {
+      const container = elMap.get(el.containerId);
+      if (container) {
+        return { ...el, x: container.x, y: container.y, width: container.width, height: container.height };
+      }
+    }
+    return el;
+  });
+
+  return { ...data, elements: fixed };
+}
+
 interface Props {
   rawContent: string;
   fileName: string;
@@ -34,7 +62,8 @@ export default function ExcalidrawView({ rawContent, fileName }: Props) {
   let parseError: string | null = null;
 
   try {
-    data = parseExcalidrawData(rawContent, fileName);
+    const parsed = parseExcalidrawData(rawContent, fileName);
+    data = fixBoundTextPositions(parsed);
   } catch (e) {
     parseError = e instanceof Error ? e.message : String(e);
   }
