@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback } from "react";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css";
 
@@ -40,13 +39,6 @@ export default function ExcalidrawView({ rawContent, fileName }: Props) {
     parseError = e instanceof Error ? e.message : String(e);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleExcalidrawAPI = useCallback((api: any) => {
-    document.fonts.ready.then(() => {
-      api.scrollToContent(api.getSceneElements(), { fitToContent: true });
-    });
-  }, []);
-
   if (parseError) {
     return (
       <div style={{ padding: "1rem", background: "var(--color-grey-100)", border: "1px solid var(--color-grey-300)", borderRadius: "6px", color: "var(--color-grey-700)", fontSize: "0.875rem" }}>
@@ -64,7 +56,7 @@ export default function ExcalidrawView({ rawContent, fileName }: Props) {
       overflow: "hidden",
     }}>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <Excalidraw initialData={data as any} viewModeEnabled zenModeEnabled excalidrawAPI={handleExcalidrawAPI} />
+      <Excalidraw initialData={data as any} viewModeEnabled zenModeEnabled />
     </div>
   );
 }
