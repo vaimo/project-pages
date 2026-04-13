@@ -28,8 +28,9 @@ export function parseExcalidrawData(raw: string, fileName: string): Record<strin
  * Files created on excalidraw.com store bound text elements (text inside
  * containers) with x:0, y:0, width:0, height:0. The renderer uses these
  * stored values directly, so the text ends up at canvas origin and is
- * invisible. We fix this by copying the container's bounds onto each
- * zero-dimension bound text element before handing the data to Excalidraw.
+ * invisible. We fix by computing each text element's height from its font
+ * metrics and respecting verticalAlign (middle/top/bottom) to position it
+ * correctly inside its container.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function fixBoundTextPositions(data: Record<string, unknown>): Record<string, unknown> {
@@ -40,10 +41,23 @@ function fixBoundTextPositions(data: Record<string, unknown>): Record<string, un
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fixed = elements.map((el: any) => {
-    if (el.type === "text" && el.containerId && el.width === 0 && el.height === 0) {
+    if (el.type === "text" && el.containerId) {
       const container = elMap.get(el.containerId);
       if (container) {
-        return { ...el, x: container.x, y: container.y, width: container.width, height: container.height };
+        const lineCount = String(el.text ?? "").split("\n").length;
+        const textHeight = (el.fontSize ?? 20) * (el.lineHeight ?? 1.25) * lineCount;
+        const verticalAlign = el.verticalAlign ?? "middle";
+
+        let y: number;
+        if (verticalAlign === "top") {
+          y = container.y;
+        } else if (verticalAlign === "bottom") {
+          y = container.y + container.height - textHeight;
+        } else {
+          y = container.y + (container.height - textHeight) / 2;
+        }
+
+        return { ...el, x: container.x, y, width: container.width, height: textHeight };
       }
     }
     return el;
