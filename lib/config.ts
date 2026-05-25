@@ -14,6 +14,23 @@ export interface VaimoBranchConfig {
   };
 }
 
+export interface ChatSecurityConfig {
+  maxQueryChars?: number;
+  maxHistoryTurns?: number;
+  rateLimit?: {
+    perMinute?: number;
+    perHour?: number;
+  };
+}
+
+export interface ChatConfig {
+  enabled?: boolean;
+  title?: string;
+  welcome?: string;
+  userGroups?: string[];
+  security?: ChatSecurityConfig;
+}
+
 export interface VaimoConfig {
   site: {
     title: string;
@@ -27,6 +44,7 @@ export interface VaimoConfig {
   features?: {
     images?: boolean;
   };
+  chat?: ChatConfig;
   include: string[];
   exclude?: string[];
 }
@@ -42,17 +60,49 @@ export interface ParsedBranch {
   comments: { enabled: boolean };
 }
 
+export interface ParsedChatSecurity {
+  maxQueryChars: number;
+  maxHistoryTurns: number;
+  rateLimit: {
+    perMinute: number;
+    perHour: number;
+  };
+}
+
+export interface ParsedChat {
+  enabled: boolean;
+  title: string;
+  welcome: string;
+  userGroups: string[] | null;
+  security: ParsedChatSecurity;
+}
+
 export interface ParsedConfig {
   site: { title: string; description: string };
   auth: { sessionDurationDays: number };
   userGroups: ParsedUserGroup[];
   branches: ParsedBranch[];
   features: { images: boolean };
+  chat: ParsedChat;
   include: string[];
   exclude: string[];
 }
 
 const DEFAULT_SESSION_DAYS = 7;
+
+const DEFAULT_CHAT_SECURITY: ParsedChatSecurity = {
+  maxQueryChars: 4000,
+  maxHistoryTurns: 10,
+  rateLimit: {
+    perMinute: 30,
+    perHour: 300,
+  },
+};
+
+function positiveInt(value: unknown, fallback: number): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
 
 export function parseConfig(raw: string): ParsedConfig {
   const parsed = yaml.load(raw) as VaimoConfig;
@@ -84,9 +134,47 @@ export function parseConfig(raw: string): ParsedConfig {
     features: {
       images: parsed.features?.images !== false,
     },
+    chat: {
+      enabled: parsed.chat?.enabled === true,
+      title: parsed.chat?.title ?? "Chat with the documentation",
+      welcome:
+        parsed.chat?.welcome ??
+        "Ask a question about the documentation. The assistant searches the knowledge base and replies with sources.",
+      userGroups:
+        Array.isArray(parsed.chat?.userGroups) && parsed.chat.userGroups.length > 0
+          ? parsed.chat.userGroups
+          : null,
+      security: {
+        maxQueryChars: positiveInt(
+          parsed.chat?.security?.maxQueryChars,
+          DEFAULT_CHAT_SECURITY.maxQueryChars,
+        ),
+        maxHistoryTurns: positiveInt(
+          parsed.chat?.security?.maxHistoryTurns,
+          DEFAULT_CHAT_SECURITY.maxHistoryTurns,
+        ),
+        rateLimit: {
+          perMinute: positiveInt(
+            parsed.chat?.security?.rateLimit?.perMinute,
+            DEFAULT_CHAT_SECURITY.rateLimit.perMinute,
+          ),
+          perHour: positiveInt(
+            parsed.chat?.security?.rateLimit?.perHour,
+            DEFAULT_CHAT_SECURITY.rateLimit.perHour,
+          ),
+        },
+      },
+    },
     include: parsed.include,
     exclude: parsed.exclude ?? [],
   };
+}
+
+/** Whether a given user group is allowed to use the chat feature for this config. */
+export function canUseChat(userGroupName: string, config: ParsedConfig): boolean {
+  if (!config.chat.enabled) return false;
+  if (config.chat.userGroups === null) return true;
+  return config.chat.userGroups.includes(userGroupName);
 }
 
 /** Returns the names of all branches accessible to the given user group, in config order. */

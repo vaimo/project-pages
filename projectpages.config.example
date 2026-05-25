@@ -87,6 +87,29 @@ branches:
   #   comments:
   #     enabled: false
 
+# ── Chat ─────────────────────────────────────────────────────────────────────
+#
+# Opt-in conversational interface over the documentation. When enabled,
+# a "Chat" tab appears in the top navigation alongside "Docs". The chat
+# backend is a third-party retrieval service configured via environment
+# variables (CHAT_API_URL, CHAT_API_KEY, ...). See .env.local.example.
+#
+# Omit this block entirely to keep the chat tab hidden.
+#
+# chat:
+#   enabled: true
+#   title: "Ask the docs"                    # Optional. Shown above the chat.
+#   welcome: "Ask anything about this..."    # Optional. First assistant message.
+#   userGroups:                              # Optional. If omitted, every
+#     - vaimo                                # group with branch access also
+#     - client                               # gets chat access.
+#   security:                                # Optional. Hardening knobs.
+#     maxQueryChars: 4000                    #   Reject longer user messages.
+#     maxHistoryTurns: 10                    #   Keep only the last N turns.
+#     rateLimit:
+#       perMinute: 30                        #   Cap messages per session/minute.
+#       perHour: 300                         #   Cap messages per session/hour.
+
 # ── Content filters ───────────────────────────────────────────────────────────
 #
 # "include" defines which files are visible. Supports full glob syntax.

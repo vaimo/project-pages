@@ -6,6 +6,7 @@ import { buildNavTree } from "@/lib/nav";
 import TopNav from "@/components/TopNav";
 import Sidebar from "@/components/Sidebar";
 import ConfigError from "@/components/ConfigError";
+import { canUseChat } from "@/lib/config";
 
 export default async function GalleryLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(await buildAuthOptions());
@@ -23,7 +24,7 @@ export default async function GalleryLayout({ children }: { children: React.Reac
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <TopNav siteTitle={config.site.title} />
+      <TopNav siteTitle={config.site.title} chatEnabled={canUseChat(session.userGroupName, config)} />
       <div style={{ display: "flex", flex: 1 }}>
         <Sidebar tree={nav} isOpen={true} />
         {children}

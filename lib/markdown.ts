@@ -98,10 +98,24 @@ function rehypeRewriteImages(docFilePath: string) {
   };
 }
 
-export async function renderMarkdown(raw: string, filePath?: string): Promise<string> {
+export interface RenderMarkdownOptions {
+  /**
+   * If true, raw HTML embedded in the markdown is discarded instead of passed
+   * through. Use for any content not authored by a trusted source — including
+   * chat answers, where the LLM could be coaxed into emitting <script> etc.
+   */
+  safe?: boolean;
+}
+
+export async function renderMarkdown(
+  raw: string,
+  filePath?: string,
+  options?: RenderMarkdownOptions,
+): Promise<string> {
+  const allowDangerousHtml = options?.safe !== true;
   const pipeline = remark()
     .use(remarkGfm)
-    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(remarkRehype, { allowDangerousHtml })
     .use(rehypeMermaid)
     .use(rehypeSlug);
 
@@ -109,7 +123,7 @@ export async function renderMarkdown(raw: string, filePath?: string): Promise<st
 
   const result = await pipeline
     .use(rehypeHighlight)
-    .use(rehypeStringify, { allowDangerousHtml: true })
+    .use(rehypeStringify, { allowDangerousHtml })
     .process(raw);
 
   return result.toString();

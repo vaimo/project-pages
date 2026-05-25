@@ -3,13 +3,15 @@
 import { signOut } from "next-auth/react";
 import Image from "next/image";
 import BranchSwitcher from "./BranchSwitcher";
+import SectionTabs from "./SectionTabs";
 
 interface TopNavProps {
   siteTitle: string;
   onMenuToggle?: () => void;
+  chatEnabled?: boolean;
 }
 
-export default function TopNav({ siteTitle, onMenuToggle }: TopNavProps) {
+export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }: TopNavProps) {
   return (
     <header
       style={{
@@ -64,11 +66,14 @@ export default function TopNav({ siteTitle, onMenuToggle }: TopNavProps) {
           fontWeight: 500,
           color: "rgba(255,255,255,0.85)",
           fontSize: "0.9375rem",
-          flex: 1,
         }}
       >
         {siteTitle}
       </span>
+
+      <div style={{ flex: 1 }} />
+
+      {chatEnabled && <SectionTabs />}
 
       <BranchSwitcher />
 

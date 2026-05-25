@@ -3,6 +3,7 @@ import { buildAuthOptions } from "@/lib/auth";
 import { getFilteredTree, getFileContent } from "@/lib/github";
 import { buildNavTree } from "@/lib/nav";
 import { renderMarkdown } from "@/lib/markdown";
+import { canUseChat } from "@/lib/config";
 import TopNav from "@/components/TopNav";
 import Sidebar from "@/components/Sidebar";
 import MarkdownView from "@/components/FileView/MarkdownView";
@@ -47,7 +48,7 @@ export default async function HomePage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <TopNav siteTitle={config.site.title} />
+      <TopNav siteTitle={config.site.title} chatEnabled={canUseChat(session.userGroupName, config)} />
       <div style={{ display: "flex", flex: 1 }}>
         <Sidebar tree={nav} isOpen={true} activePath={readmeEntry?.path} />
 
