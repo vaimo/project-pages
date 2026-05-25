@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChatMessage from "./ChatMessage";
 import ChatComposer from "./ChatComposer";
+import {
+  loadChatHistory,
+  saveChatHistory,
+  clearChatHistory,
+} from "@/lib/chat-storage";
 
 interface Reference {
   reference_id?: string;
@@ -52,9 +57,28 @@ export default function ChatView({
   maxQueryChars,
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [sending, setSending] = useState(false);
   const [health, setHealth] = useState<HealthState>({ ok: false, checking: true });
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Hydrate from localStorage on first mount.
+  useEffect(() => {
+    const stored = loadChatHistory();
+    if (stored.length > 0) {
+      setMessages(stored as Message[]);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist whenever the conversation changes. We skip pending placeholders
+  // (so a reload mid-response doesn't leave a stuck "typing" bubble) and
+  // failed turns (clutter without value).
+  useEffect(() => {
+    if (!hydrated) return;
+    const finalized = messages.filter((m) => !m.pending && !m.error);
+    saveChatHistory(finalized);
+  }, [messages, hydrated]);
 
   const checkHealth = useCallback(async () => {
     setHealth((h) => ({ ...h, checking: true }));
@@ -178,6 +202,7 @@ export default function ChatView({
   const clear = useCallback(() => {
     if (sending) return;
     setMessages([]);
+    clearChatHistory();
   }, [sending]);
 
   const isEmpty = messages.length === 0;
