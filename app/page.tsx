@@ -48,7 +48,7 @@ export default async function HomePage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <TopNav siteTitle={config.site.title} chatEnabled={canUseChat(session.userGroupName, config)} />
+      <TopNav siteTitle={config.site.title} chatEnabled={canUseChat(session.userGroupName, config, session.branchName)} />
       <div style={{ display: "flex", flex: 1 }}>
         <Sidebar tree={nav} isOpen={true} activePath={readmeEntry?.path} />
 

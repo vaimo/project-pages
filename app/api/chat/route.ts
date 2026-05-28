@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { buildAuthOptions } from "@/lib/auth";
 import { getConfig } from "@/lib/github";
-import { canUseChat } from "@/lib/config";
+import { canUseChat, getBranchChatBackendUrl } from "@/lib/config";
 import { renderMarkdown } from "@/lib/markdown";
 import { consumeRateLimit } from "@/lib/chat-rate-limit";
-import {
-  runChatQuery,
-  isChatBackendConfigured,
-  type ChatTurn,
-} from "@/lib/chat";
+import { runChatQuery, type ChatTurn } from "@/lib/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +29,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Configuration error" }, { status: 500 });
   }
 
-  if (!canUseChat(session.userGroupName, config)) {
-    return NextResponse.json({ error: "Chat is not enabled" }, { status: 403 });
-  }
-  if (!isChatBackendConfigured()) {
+  if (!canUseChat(session.userGroupName, config, session.branchName)) {
     return NextResponse.json(
-      { error: "Chat backend is not configured on this deployment" },
+      { error: "Chat is not enabled for this branch" },
+      { status: 403 },
+    );
+  }
+
+  const backendUrl = getBranchChatBackendUrl(session.branchName, config);
+  if (!backendUrl) {
+    // canUseChat already covers this, but guard again so the type narrows
+    // and so a config edge case can't fall through to the backend call.
+    return NextResponse.json(
+      { error: "Chat backend is not configured for this branch" },
       { status: 503 },
     );
   }
@@ -113,7 +116,7 @@ export async function POST(req: NextRequest) {
   // ── Call backend ──────────────────────────────────────────────────────────
   const startedAt = Date.now();
   try {
-    const result = await runChatQuery({ query: rawQuery, history });
+    const result = await runChatQuery({ query: rawQuery, history }, backendUrl);
     const responseTimeMs = Date.now() - startedAt;
     // Use safe markdown: discard any raw HTML the LLM tries to emit.
     const html = result.response

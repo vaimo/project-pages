@@ -6,12 +6,22 @@ export interface UserGroupConfig {
   passphrase: string;
 }
 
+export interface BranchChatConfig {
+  /**
+   * Backend URL for the LightRAG-compatible chat service indexed over this
+   * branch's content. The Chat tab is visible only on branches that declare
+   * this field.
+   */
+  backendUrl?: string;
+}
+
 export interface VaimoBranchConfig {
   name: string;
   userGroups: string[];
   comments?: {
     enabled?: boolean;
   };
+  chat?: BranchChatConfig;
 }
 
 export interface ChatSecurityConfig {
@@ -58,6 +68,7 @@ export interface ParsedBranch {
   name: string;
   userGroups: string[];
   comments: { enabled: boolean };
+  chat: { backendUrl: string | null };
 }
 
 export interface ParsedChatSecurity {
@@ -104,6 +115,12 @@ function positiveInt(value: unknown, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+function normaliseBackendUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export function parseConfig(raw: string): ParsedConfig {
   const parsed = yaml.load(raw) as VaimoConfig;
 
@@ -129,6 +146,9 @@ export function parseConfig(raw: string): ParsedConfig {
       userGroups: b.userGroups ?? [],
       comments: {
         enabled: b.comments?.enabled ?? false,
+      },
+      chat: {
+        backendUrl: normaliseBackendUrl(b.chat?.backendUrl),
       },
     })),
     features: {
@@ -170,11 +190,33 @@ export function parseConfig(raw: string): ParsedConfig {
   };
 }
 
-/** Whether a given user group is allowed to use the chat feature for this config. */
-export function canUseChat(userGroupName: string, config: ParsedConfig): boolean {
+/**
+ * Returns the chat backend URL configured for a given branch, or null if the
+ * branch doesn't have one set (chat tab should be hidden on that branch).
+ */
+export function getBranchChatBackendUrl(
+  branchName: string,
+  config: ParsedConfig,
+): string | null {
+  const branch = config.branches.find((b) => b.name === branchName);
+  return branch?.chat.backendUrl ?? null;
+}
+
+/**
+ * Whether a given user group + branch combination is allowed to use the chat.
+ * True only when chat is enabled globally, the user group is allowed, AND the
+ * specific branch has a chat backend URL configured.
+ */
+export function canUseChat(
+  userGroupName: string,
+  config: ParsedConfig,
+  branchName: string,
+): boolean {
   if (!config.chat.enabled) return false;
-  if (config.chat.userGroups === null) return true;
-  return config.chat.userGroups.includes(userGroupName);
+  if (config.chat.userGroups !== null && !config.chat.userGroups.includes(userGroupName)) {
+    return false;
+  }
+  return getBranchChatBackendUrl(branchName, config) !== null;
 }
 
 /** Returns the names of all branches accessible to the given user group, in config order. */

@@ -87,6 +87,7 @@ A list of Git branches that Project Pages can serve. At least one entry is requi
 | `branches[].name` | Yes | The Git branch name (must exist in the repository) |
 | `branches[].userGroups` | Yes | List of user group names that can access this branch |
 | `branches[].comments.enabled` | No | Whether inline comments are enabled for this branch. Defaults to `false`. |
+| `branches[].chat.backendUrl` | No | Base URL of the LightRAG-compatible chat service indexed over this branch's content. When present, the **Chat** tab appears in the top nav while this branch is active. Omit to hide chat on this branch. See [Chat](#chat) below for the rationale. |
 
 **How it works:** When a user logs in, the app identifies their group by passphrase, then finds all branches that list that group. The user lands on the first accessible branch. If multiple branches are accessible, a branch switcher appears in the top nav so they can move between them without logging out.
 
@@ -103,6 +104,25 @@ Optional. A list of glob patterns. Files matching any pattern are hidden, even i
 | Field | Required | Description |
 |---|---|---|
 | `features.images` | No | Auto-include image files in the file tree. Defaults to `true`. |
+
+### `chat`
+
+Opt-in conversational interface over the documentation. When enabled, a **Chat** tab appears in the top nav alongside **Docs** — but only on branches that declare their own `chat.backendUrl`.
+
+| Field | Required | Description |
+|---|---|---|
+| `chat.enabled` | No | Master switch. Set `true` to allow the chat tab anywhere. Defaults to `false`. |
+| `chat.title` | No | Heading shown above the welcome message on the chat page. Defaults to "Chat with the documentation". |
+| `chat.welcome` | No | First-time welcome text rendered above the composer. |
+| `chat.userGroups` | No | List of user groups allowed to use the chat. Omit to allow every group that has branch access. |
+| `chat.security.maxQueryChars` | No | Reject user messages longer than this. Defaults to `4000`. |
+| `chat.security.maxHistoryTurns` | No | Truncate conversation history sent to the backend to the last N turns. Defaults to `10`. |
+| `chat.security.rateLimit.perMinute` | No | Per-session messages allowed per minute. Defaults to `30`. |
+| `chat.security.rateLimit.perHour` | No | Per-session messages allowed per hour. Defaults to `300`. |
+
+**Why backend URLs live on branches, not on `chat`:** LightRAG cannot switch corpora per query — each running LightRAG process is bound to one indexed corpus. Branches are typically different views of the docs (internal vs client) and need different answers, so each branch points at its own LightRAG instance via `branches[].chat.backendUrl`. The Chat tab is shown only when the *current* branch has a URL set; switching to a branch without one hides the tab. See [Deployment → Chat backends](./deployment.md) for the operational side.
+
+Shared chat settings (API key, query mode, language instruction, timeout) live in environment variables — see [Deployment → Environment Variables](./deployment.md#environment-variables).
 
 ---
 

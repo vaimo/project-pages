@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { buildAuthOptions } from "@/lib/auth";
 import { getConfig } from "@/lib/github";
-import { canUseChat } from "@/lib/config";
-import { checkChatBackendHealth, isChatBackendConfigured } from "@/lib/chat";
+import { getBranchChatBackendUrl } from "@/lib/config";
+import { checkChatBackendHealth } from "@/lib/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -24,26 +24,26 @@ export async function GET() {
     );
   }
 
-  const enabledInConfig = config.chat.enabled;
-  const allowedForUser = canUseChat(session.userGroupName, config);
-  const backendConfigured = isChatBackendConfigured();
-
-  if (!enabledInConfig) {
+  if (!config.chat.enabled) {
     return NextResponse.json({ ok: false, enabled: false, reason: "disabled" });
   }
-  if (!allowedForUser) {
+
+  const userGroups = config.chat.userGroups;
+  if (userGroups !== null && !userGroups.includes(session.userGroupName)) {
     return NextResponse.json({ ok: false, enabled: true, reason: "forbidden" });
   }
-  if (!backendConfigured) {
+
+  const backendUrl = getBranchChatBackendUrl(session.branchName, config);
+  if (!backendUrl) {
     return NextResponse.json({
       ok: false,
       enabled: true,
       reason: "backend-missing",
-      error: "Chat backend URL is not configured on this deployment",
+      error: `No chat backend URL is set for branch "${session.branchName}"`,
     });
   }
 
-  const health = await checkChatBackendHealth();
+  const health = await checkChatBackendHealth(backendUrl);
   return NextResponse.json({
     ok: health.ok,
     enabled: true,

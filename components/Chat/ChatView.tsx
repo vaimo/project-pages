@@ -44,6 +44,7 @@ interface ChatViewProps {
   welcome: string;
   backendConfigured: boolean;
   maxQueryChars: number;
+  branchName: string;
 }
 
 function uid() {
@@ -55,6 +56,7 @@ export default function ChatView({
   welcome,
   backendConfigured,
   maxQueryChars,
+  branchName,
 }: ChatViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -62,14 +64,16 @@ export default function ChatView({
   const [health, setHealth] = useState<HealthState>({ ok: false, checking: true });
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Hydrate from localStorage on first mount.
+  // Hydrate from this branch's localStorage slot on first mount. Since the
+  // chat page passes key={branchName} to ChatView, the component remounts on
+  // every branch change — so this effect re-fires with the new branch's data.
   useEffect(() => {
-    const stored = loadChatHistory();
+    const stored = loadChatHistory(branchName);
     if (stored.length > 0) {
       setMessages(stored as Message[]);
     }
     setHydrated(true);
-  }, []);
+  }, [branchName]);
 
   // Persist whenever the conversation changes. We skip pending placeholders
   // (so a reload mid-response doesn't leave a stuck "typing" bubble) and
@@ -77,8 +81,8 @@ export default function ChatView({
   useEffect(() => {
     if (!hydrated) return;
     const finalized = messages.filter((m) => !m.pending && !m.error);
-    saveChatHistory(finalized);
-  }, [messages, hydrated]);
+    saveChatHistory(branchName, finalized);
+  }, [messages, hydrated, branchName]);
 
   const checkHealth = useCallback(async () => {
     setHealth((h) => ({ ...h, checking: true }));
@@ -202,8 +206,8 @@ export default function ChatView({
   const clear = useCallback(() => {
     if (sending) return;
     setMessages([]);
-    clearChatHistory();
-  }, [sending]);
+    clearChatHistory(branchName);
+  }, [sending, branchName]);
 
   const isEmpty = messages.length === 0;
   const canSend = health.ok && !sending;
@@ -384,7 +388,7 @@ function HealthBanner({
   const message = (() => {
     switch (health.reason) {
       case "backend-missing":
-        return "Chat is enabled in this site's configuration, but no chat backend URL is set on this deployment. Ask an administrator to configure CHAT_API_URL.";
+        return "Chat is enabled in this site's configuration, but no chat backend URL is set for this branch. Ask an administrator to set chat.backendUrl on this branch in projectpages.config.";
       case "backend-down":
         return `The chat backend is currently unavailable${
           health.error ? ` (${health.error})` : ""

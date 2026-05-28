@@ -65,6 +65,11 @@ userGroups:
 #   - "name" must match an existing Git branch in the source repo.
 #   - "userGroups" lists which groups can access this branch (by name).
 #   - "comments.enabled" controls inline comments for this branch (default: false).
+#   - "chat.backendUrl" enables the Chat tab on this branch and points it at
+#     the LightRAG-compatible service indexed over this branch's content.
+#     Each branch needs its own service indexed over its own corpus — LightRAG
+#     cannot switch corpora per query. Omit this field to hide the Chat tab
+#     when the user is on this branch.
 #
 branches:
   - name: master                        # Full internal content
@@ -73,12 +78,15 @@ branches:
       - client
     comments:
       enabled: false
+    chat:
+      backendUrl: "http://127.0.0.1:9621"   # LightRAG indexed over master
 
   - name: client                        # Curated client-facing content
     userGroups:
       - client
     comments:
       enabled: false
+    # Omit chat.backendUrl to hide the Chat tab on this branch.
 
   # Add more branches as needed:
   # - name: external-partner
@@ -86,15 +94,21 @@ branches:
   #     - external-partner
   #   comments:
   #     enabled: false
+  #   chat:
+  #     backendUrl: "http://127.0.0.1:9623"
 
 # ── Chat ─────────────────────────────────────────────────────────────────────
 #
-# Opt-in conversational interface over the documentation. When enabled,
-# a "Chat" tab appears in the top navigation alongside "Docs". The chat
-# backend is a third-party retrieval service configured via environment
-# variables (CHAT_API_URL, CHAT_API_KEY, ...). See .env.local.example.
+# Opt-in conversational interface over the documentation. When enabled, a
+# "Chat" tab appears in the top navigation alongside "Docs" — but only on
+# branches whose entry above declares its own chat.backendUrl. Each branch
+# talks to its own LightRAG-compatible retrieval service (one process per
+# branch, each indexed over that branch's content).
 #
-# Omit this block entirely to keep the chat tab hidden.
+# Shared chat configuration (api key, query mode, language instruction,
+# timeout) lives in environment variables — see .env.local.example.
+#
+# Omit this block entirely to keep the chat tab hidden everywhere.
 #
 # chat:
 #   enabled: true

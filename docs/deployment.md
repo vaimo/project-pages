@@ -45,6 +45,12 @@ npm run dev
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (server-side only, never exposed to browser) |
 | `VERCEL_DEPLOY_HOOK_URL` | Yes | Vercel deploy hook URL, called when docs repo receives a push |
+| `CHAT_API_KEY` | No | Bearer token sent as `Authorization: Bearer <key>` to every chat backend. Leave empty if the backends require no auth. See [Chat backends](#chat-backends). |
+| `CHAT_QUERY_MODE` | No | Default LightRAG `mode` parameter. Defaults to `naive`. |
+| `CHAT_TOP_K` | No | Default LightRAG `top_k`. Defaults to `40`. |
+| `CHAT_CHUNK_TOP_K` | No | Default LightRAG `chunk_top_k`. Defaults to `25`. |
+| `CHAT_LANGUAGE_INSTRUCTION` | No | Forwarded as `user_prompt` on every query. Defaults to "You MUST respond in English." (works around DeepSeek language drift). |
+| `CHAT_TIMEOUT_MS` | No | Abort the chat backend call after this many milliseconds. Defaults to `120000`. |
 
 ---
 
@@ -204,6 +210,32 @@ Run the migrations in order in the **Supabase SQL editor**:
 2. `supabase/migrations/002_add_branch_to_comments.sql`
 
 Credentials are in **Supabase → Project Settings → API**.
+
+## Chat backends
+
+Each branch with the **Chat** tab enabled points at its own LightRAG-compatible retrieval service. LightRAG cannot switch corpora per query, so a `master` branch indexed over the internal docs and a `client` branch indexed over the curated docs need two separate LightRAG processes — typically on different ports of the same machine, or on different hosts in production.
+
+**To enable chat on a branch:**
+
+1. Stand up a LightRAG instance indexed over that branch's content. (Upstream: https://github.com/HKUDS/LightRAG. The PARA knowledge base in this engagement documents the indexing playbook in `lightRAG/recommended-configuration/`.)
+2. Confirm it responds:
+   ```bash
+   curl -s http://<host>:<port>/health
+   ```
+3. Add the URL to that branch's entry in `projectpages.config`:
+   ```yaml
+   branches:
+     - name: master
+       userGroups: [vaimo, client]
+       chat:
+         backendUrl: "http://127.0.0.1:9621"
+   ```
+4. Set `chat.enabled: true` at the top level of the same config. (It's a master switch — `false` hides chat everywhere regardless of branch URLs.)
+5. Set shared chat env vars (`CHAT_API_KEY`, etc.) in Vercel if needed.
+
+**Branches without `chat.backendUrl`** don't show the Chat tab while they're active. This is by design — Cohere/DeepSeek charges add up, and it's safer to opt branches in explicitly than to leak internal content to a client-facing branch by accident.
+
+For the security knobs (rate limits, input length cap, history truncation) that apply to every chat call regardless of branch, see [Configuration → chat](./configuration.md#chat).
 
 ## Content Caching
 

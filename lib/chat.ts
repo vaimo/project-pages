@@ -1,7 +1,8 @@
 /**
- * Thin client for a LightRAG-compatible chat backend. The backend is selected
- * entirely through env vars; the rest of the app only knows about
- * `isChatBackendConfigured()`, `checkChatBackendHealth()`, and `runChatQuery()`.
+ * Thin client for a LightRAG-compatible chat backend. The backend URL is
+ * supplied by the caller (resolved per-branch from projectpages.config in the
+ * API routes); the rest of the settings (api key, mode, top_k, language
+ * instruction, timeout) still come from env vars.
  */
 
 export interface ChatBackendSettings {
@@ -49,11 +50,13 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-export function getChatBackendSettings(): ChatBackendSettings | null {
-  const url = (process.env.CHAT_API_URL ?? "").trim().replace(/\/+$/, "");
-  if (!url) return null;
+function normaliseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+export function getChatBackendSettings(url: string): ChatBackendSettings {
   return {
-    url,
+    url: normaliseUrl(url),
     apiKey: process.env.CHAT_API_KEY?.trim() || null,
     mode: (process.env.CHAT_QUERY_MODE ?? "naive").trim() || "naive",
     topK: envInt("CHAT_TOP_K", 40),
@@ -63,10 +66,6 @@ export function getChatBackendSettings(): ChatBackendSettings | null {
       "You MUST respond in English.",
     timeoutMs: envInt("CHAT_TIMEOUT_MS", 120_000),
   };
-}
-
-export function isChatBackendConfigured(): boolean {
-  return getChatBackendSettings() !== null;
 }
 
 function buildHeaders(settings: ChatBackendSettings, json: boolean): HeadersInit {
@@ -85,10 +84,8 @@ async function withTimeout<T>(p: Promise<T>, ms: number, controller: AbortContro
   }
 }
 
-export async function checkChatBackendHealth(): Promise<ChatHealth> {
-  const settings = getChatBackendSettings();
-  if (!settings) return { ok: false, error: "Chat backend URL is not configured" };
-
+export async function checkChatBackendHealth(url: string): Promise<ChatHealth> {
+  const settings = getChatBackendSettings(url);
   const controller = new AbortController();
   try {
     const res = await withTimeout(
@@ -118,11 +115,11 @@ export async function checkChatBackendHealth(): Promise<ChatHealth> {
   }
 }
 
-export async function runChatQuery(input: ChatQueryInput): Promise<ChatQueryResult> {
-  const settings = getChatBackendSettings();
-  if (!settings) {
-    throw new Error("Chat backend URL is not configured");
-  }
+export async function runChatQuery(
+  input: ChatQueryInput,
+  url: string,
+): Promise<ChatQueryResult> {
+  const settings = getChatBackendSettings(url);
 
   const conversation_history = (input.history ?? [])
     .filter((t) => t.content?.trim())
