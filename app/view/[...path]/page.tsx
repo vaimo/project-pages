@@ -78,6 +78,11 @@ export default async function ViewPage({ params }: Props) {
       skip_empty_lines: true,
       bom: true,
       trim: true,
+      // Tolerate human-authored CSVs that don't quite hit RFC 4180:
+      // stray quotes inside unquoted fields, and rows with the wrong
+      // number of columns. One bad cell shouldn't 500 the whole page.
+      relax_quotes: true,
+      relax_column_count: true,
     });
     const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
     content = <CsvView headers={headers} rows={rows} />;
