@@ -39,53 +39,103 @@ export default function BranchSwitcher() {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
+      <div
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: "0.4rem",
-          background: "none",
+          alignItems: "stretch",
           border: "1px solid rgba(255,255,255,0.25)",
           borderRadius: "4px",
-          padding: "0.35rem 0.7rem",
-          fontSize: "0.8125rem",
-          color: "rgba(255,255,255,0.7)",
-          cursor: "pointer",
+          overflow: "hidden",
           whiteSpace: "nowrap",
         }}
-        aria-haspopup="listbox"
-        aria-expanded={open}
       >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-          fill="currentColor"
-          style={{ opacity: 0.6, flexShrink: 0 }}
+        <button
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            background: "none",
+            border: "none",
+            padding: "0.35rem 0.7rem",
+            fontSize: "0.8125rem",
+            color: "rgba(255,255,255,0.7)",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={open}
         >
-          {/* branch icon */}
-          <path d="M11.75 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 13.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM5 5.5v5" />
-          <path d="M5 5.5A3.5 3.5 0 0 0 8.5 9H10" stroke="currentColor" strokeWidth="1.5" fill="none" />
-        </svg>
-        <span>Branch: <strong style={{ color: "rgba(255,255,255,0.9)" }}>{switching ? "…" : current}</strong></span>
-        {branches.length > 1 && (
           <svg
-            width="10"
-            height="10"
-            viewBox="0 0 10 10"
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
             fill="currentColor"
-            style={{
-              opacity: 0.5,
-              transform: open ? "rotate(180deg)" : "none",
-              transition: "transform 0.15s",
-              flexShrink: 0,
-            }}
+            style={{ opacity: 0.6, flexShrink: 0 }}
           >
-            <path d="M1 3l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            {/* branch icon */}
+            <path d="M11.75 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 13.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM5 5.5v5" />
+            <path d="M5 5.5A3.5 3.5 0 0 0 8.5 9H10" stroke="currentColor" strokeWidth="1.5" fill="none" />
           </svg>
-        )}
-      </button>
+          <span>Branch: <strong style={{ color: "rgba(255,255,255,0.9)" }}>{switching ? "…" : current}</strong></span>
+          {branches.length > 1 && (
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="currentColor"
+              style={{
+                opacity: 0.5,
+                transform: open ? "rotate(180deg)" : "none",
+                transition: "transform 0.15s",
+                flexShrink: 0,
+              }}
+            >
+              <path d="M1 3l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+
+        {/* Divider between the branch label and the download action */}
+        <span style={{ width: 1, background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
+
+        {/* Download the current branch's documentation as a zip. The server
+            resolves the branch from the session, so no query param is needed. */}
+        <a
+          href="/api/download/archive"
+          download
+          aria-label="Download entire repository"
+          title="Download entire repository"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "0 0.6rem",
+            color: "rgba(255,255,255,0.7)",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.95)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "none";
+            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            style={{ flexShrink: 0 }}
+            aria-hidden="true"
+          >
+            {/* download icon: arrow into tray */}
+            <path d="M8 1a.75.75 0 0 1 .75.75v6.69l1.97-1.97a.75.75 0 1 1 1.06 1.06L8.53 10.78a.75.75 0 0 1-1.06 0L4.22 7.53a.75.75 0 0 1 1.06-1.06l1.97 1.97V1.75A.75.75 0 0 1 8 1z" />
+            <path d="M2.5 9.75a.75.75 0 0 1 .75.75v2.25c0 .138.112.25.25.25h9a.25.25 0 0 0 .25-.25V10.5a.75.75 0 0 1 1.5 0v2.25A1.75 1.75 0 0 1 12.5 14.5h-9A1.75 1.75 0 0 1 1.75 12.75V10.5a.75.75 0 0 1 .75-.75z" />
+          </svg>
+        </a>
+      </div>
 
       {open && branches.length > 1 && (
         <div

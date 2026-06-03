@@ -178,3 +178,20 @@ export async function getRawFileBuffer(filePath: string, branch: string): Promis
   const name = filePath.split("/").pop() ?? filePath;
   return { buffer, name };
 }
+
+/** Returns the docs repo name (without the owner) — used to name downloads. */
+export function getDocsRepoName(): string {
+  return getDocsRepo().repo;
+}
+
+/**
+ * Downloads the full Git archive (zipball) for a branch in a single GitHub API
+ * call. GitHub pre-generates these per commit, so this is fast and always
+ * matches the branch's current head. The returned bytes include GitHub's
+ * top-level "owner-repo-sha/" wrapper folder — callers strip and re-pack.
+ */
+export async function downloadBranchZipball(branch: string): Promise<Buffer> {
+  const { owner, repo } = getDocsRepo();
+  const res = await octokit().repos.downloadZipballArchive({ owner, repo, ref: branch });
+  return Buffer.from(res.data as ArrayBuffer);
+}
