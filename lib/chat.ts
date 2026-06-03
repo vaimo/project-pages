@@ -71,7 +71,9 @@ export function getChatBackendSettings(url: string): ChatBackendSettings {
 function buildHeaders(settings: ChatBackendSettings, json: boolean): HeadersInit {
   const headers: Record<string, string> = {};
   if (json) headers["Content-Type"] = "application/json";
-  if (settings.apiKey) headers["Authorization"] = `Bearer ${settings.apiKey}`;
+  // LightRAG authenticates via the X-API-Key header; it ignores
+  // Authorization: Bearer. Send the key under the header it actually checks.
+  if (settings.apiKey) headers["X-API-Key"] = settings.apiKey;
   return headers;
 }
 
