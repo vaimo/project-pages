@@ -21,6 +21,7 @@ interface Message {
   references?: Reference[];
   stats?: ChatStats;
   pending?: boolean;
+  streaming?: boolean;
   error?: string;
 }
 
@@ -65,20 +66,47 @@ export default function ChatMessage({ message }: { message: Message }) {
 
 function AssistantBody({ message }: { message: Message }) {
   const html = message.html;
+  const streaming = message.streaming;
   return (
     <>
       {html ? (
+        // Formatted answer, shown once streaming completes.
         <div
           className="prose"
           style={{ maxWidth: "100%" }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
-        <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{message.content}</p>
+        // Live text while streaming (or plain fallback if HTML is unavailable).
+        <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+          {message.content}
+          {streaming && <StreamingCaret />}
+        </p>
       )}
-      <References refs={message.references ?? []} />
-      <AssistantToolbar message={message} />
+      {/* Sources and tools settle in only after the full answer has arrived. */}
+      {!streaming && <References refs={message.references ?? []} />}
+      {!streaming && <AssistantToolbar message={message} />}
     </>
+  );
+}
+
+function StreamingCaret() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-block",
+        width: "0.5em",
+        marginLeft: "1px",
+        color: "var(--color-grey-500)",
+        animation: "chat-caret 1s steps(1) infinite",
+      }}
+    >
+      ▍
+      <style>{`
+        @keyframes chat-caret { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+      `}</style>
+    </span>
   );
 }
 

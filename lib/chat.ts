@@ -163,3 +163,60 @@ export async function runChatQuery(
     references: Array.isArray(json.references) ? json.references : [],
   };
 }
+
+/**
+ * One line of LightRAG's NDJSON stream from POST /query/stream. Each line is a
+ * JSON object that is one of: a references list (emitted first), a response
+ * text chunk, or an error.
+ */
+export interface ChatStreamLine {
+  references?: ChatReference[];
+  response?: string;
+  error?: string;
+}
+
+/**
+ * Opens a streaming query against the LightRAG /query/stream endpoint and
+ * returns the raw upstream Response. The body is NDJSON (application/x-ndjson):
+ * one JSON object per line. The caller is responsible for reading and relaying
+ * res.body. Throws if the backend rejects the request before streaming starts.
+ */
+export async function openChatQueryStream(
+  input: ChatQueryInput,
+  url: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const settings = getChatBackendSettings(url);
+
+  const conversation_history = (input.history ?? [])
+    .filter((t) => t.content?.trim())
+    .map((t) => ({ role: t.role, content: t.content }));
+
+  const body = {
+    query: input.query,
+    mode: settings.mode,
+    top_k: settings.topK,
+    chunk_top_k: settings.chunkTopK,
+    include_references: true,
+    response_type: "Multiple Paragraphs",
+    user_prompt: settings.languageInstruction,
+    stream: true,
+    ...(conversation_history.length > 0 ? { conversation_history } : {}),
+  };
+
+  const res = await fetch(`${settings.url}/query/stream`, {
+    method: "POST",
+    headers: buildHeaders(settings, true),
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Chat backend returned HTTP ${res.status}${text ? `: ${text.slice(0, 300)}` : ""}`,
+    );
+  }
+
+  return res;
+}

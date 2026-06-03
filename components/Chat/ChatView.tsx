@@ -29,6 +29,7 @@ interface Message {
   references?: Reference[];
   stats?: ChatStats;
   pending?: boolean;
+  streaming?: boolean;
   error?: string;
 }
 
@@ -80,7 +81,7 @@ export default function ChatView({
   // failed turns (clutter without value).
   useEffect(() => {
     if (!hydrated) return;
-    const finalized = messages.filter((m) => !m.pending && !m.error);
+    const finalized = messages.filter((m) => !m.pending && !m.streaming && !m.error);
     saveChatHistory(branchName, finalized);
   }, [messages, hydrated, branchName]);
 
@@ -139,14 +140,23 @@ export default function ChatView({
       setMessages((prev) => [...prev, userMsg, placeholder]);
       setSending(true);
 
+      // Patches the assistant placeholder by id, leaving other messages intact.
+      const patch = (fields: Partial<Message>) =>
+        setMessages((prev) =>
+          prev.map((m) => (m.id === placeholder.id ? { ...m, ...fields } : m)),
+        );
+
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: trimmed, history }),
         });
-        const data = await res.json();
+
+        // Errors are returned as JSON (not a stream); a successful response is
+        // the NDJSON event stream relayed from the backend.
         if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
           let errMsg: string;
           if (res.status === 429 && typeof data?.retryAfterSeconds === "number") {
             const window = data?.reason === "per-minute" ? "minute" : "hour";
@@ -159,33 +169,66 @@ export default function ChatView({
             errMsg =
               data?.detail || data?.error || `Request failed (HTTP ${res.status})`;
           }
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === placeholder.id
-                ? { ...m, pending: false, error: errMsg, content: "" }
-                : m,
-            ),
-          );
+          patch({ pending: false, streaming: false, error: errMsg, content: "" });
+        } else if (!res.body) {
+          patch({ pending: false, streaming: false, error: "Empty response from server.", content: "" });
         } else {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === placeholder.id
-                ? {
-                    ...m,
-                    pending: false,
-                    content: data.response ?? "",
-                    html: typeof data.html === "string" ? data.html : undefined,
-                    references: Array.isArray(data.references)
-                      ? data.references
-                      : [],
-                    stats:
-                      data.stats && typeof data.stats === "object"
-                        ? (data.stats as ChatStats)
-                        : undefined,
-                  }
-                : m,
-            ),
-          );
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          let acc = "";
+
+          const handle = (line: string) => {
+            const t = line.trim();
+            if (!t) return;
+            let evt: {
+              type?: string;
+              text?: string;
+              html?: string;
+              references?: Reference[];
+              stats?: ChatStats;
+              error?: string;
+            };
+            try {
+              evt = JSON.parse(t);
+            } catch {
+              return;
+            }
+            if (evt.type === "delta") {
+              acc += evt.text ?? "";
+              // First chunk flips the typing dots into live streaming text.
+              patch({ pending: false, streaming: true, content: acc });
+            } else if (evt.type === "references") {
+              patch({ references: evt.references ?? [] });
+            } else if (evt.type === "done") {
+              patch({
+                pending: false,
+                streaming: false,
+                content: acc,
+                html: typeof evt.html === "string" ? evt.html : undefined,
+                references: Array.isArray(evt.references) ? evt.references : [],
+                stats:
+                  evt.stats && typeof evt.stats === "object" ? evt.stats : undefined,
+              });
+            } else if (evt.type === "error") {
+              patch({
+                pending: false,
+                streaming: false,
+                error: evt.error || "The assistant stopped unexpectedly.",
+                content: acc,
+              });
+            }
+          };
+
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) handle(line);
+          }
+          if (buf.trim()) handle(buf);
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);

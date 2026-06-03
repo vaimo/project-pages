@@ -5,7 +5,13 @@ import { getConfig } from "@/lib/github";
 import { canUseChat, getBranchChatBackendUrl } from "@/lib/config";
 import { renderMarkdown } from "@/lib/markdown";
 import { consumeRateLimit } from "@/lib/chat-rate-limit";
-import { runChatQuery, type ChatTurn } from "@/lib/chat";
+import {
+  openChatQueryStream,
+  getChatBackendSettings,
+  type ChatTurn,
+  type ChatReference,
+  type ChatStreamLine,
+} from "@/lib/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +19,24 @@ function rateLimitKey(req: NextRequest, userGroup: string): string {
   const fwd = req.headers.get("x-forwarded-for") ?? "";
   const ip = fwd.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
   return `${userGroup}|${ip}`;
+}
+
+/**
+ * DeepSeek (and similar reasoning models) prefix their answer with a
+ * <think>…</think> block. End users should see only the answer, so we hide
+ * everything up to and including the closing tag. While the block is still
+ * open this returns "" so the UI keeps showing the "thinking" indicator, and a
+ * partial opening tag split across chunks is waited out rather than flashed.
+ */
+function visibleAnswer(raw: string): string {
+  const ls = raw.replace(/^\s+/, "");
+  const close = ls.indexOf("</think>");
+  if (close !== -1) {
+    return ls.slice(close + "</think>".length).replace(/^\s+/, "");
+  }
+  if (ls.startsWith("<think>")) return "";
+  if (ls.length < 7 && "<think>".startsWith(ls)) return "";
+  return ls;
 }
 
 export async function POST(req: NextRequest) {
@@ -113,33 +137,124 @@ export async function POST(req: NextRequest) {
       ? incomingHistory.slice(-security.maxHistoryTurns)
       : incomingHistory;
 
-  // ── Call backend ──────────────────────────────────────────────────────────
+  // ── Stream from backend ───────────────────────────────────────────────────
+  // We relay LightRAG's NDJSON stream to the browser so the answer appears
+  // progressively. Our own wire format (also NDJSON) is one JSON object per
+  // line with a "type" field: "references" | "delta" | "done" | "error".
   const startedAt = Date.now();
+  const controller = new AbortController();
+  const { timeoutMs } = getChatBackendSettings(backendUrl);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let upstream: Response;
   try {
-    const result = await runChatQuery({ query: rawQuery, history }, backendUrl);
-    const responseTimeMs = Date.now() - startedAt;
-    // Use safe markdown: discard any raw HTML the LLM tries to emit.
-    const html = result.response
-      ? await renderMarkdown(result.response, undefined, { safe: true })
-      : "";
-    const chars = result.response.length;
-    return NextResponse.json({
-      response: result.response,
-      html,
-      references: result.references,
-      stats: {
-        responseTimeMs,
-        responseChars: chars,
-        approxOutputTokens: Math.round(chars / 4),
-        sourcesCount: result.references.length,
-      },
-    });
+    upstream = await openChatQueryStream(
+      { query: rawQuery, history },
+      backendUrl,
+      controller.signal,
+    );
   } catch (err) {
+    clearTimeout(timeout);
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[chat] Query failed:", msg);
+    console.error("[chat] Stream open failed:", msg);
     return NextResponse.json(
       { error: "Chat backend request failed", detail: msg },
       { status: 502 },
     );
   }
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(ctrl) {
+      const reader = upstream.body!.getReader();
+      let buf = "";
+      let raw = "";        // full upstream text, including any <think> block
+      let emittedLen = 0;  // length of the visible answer already streamed
+      let references: ChatReference[] = [];
+
+      const emit = (obj: unknown) =>
+        ctrl.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+
+      const handleLine = (line: string) => {
+        const t = line.trim();
+        if (!t) return;
+        let obj: ChatStreamLine;
+        try {
+          obj = JSON.parse(t) as ChatStreamLine;
+        } catch {
+          return; // ignore malformed lines
+        }
+        if (Array.isArray(obj.references)) {
+          references = obj.references;
+          emit({ type: "references", references });
+        } else if (typeof obj.response === "string" && obj.response) {
+          raw += obj.response;
+          // Emit only the newly-revealed slice of the answer (post-<think>).
+          const visible = visibleAnswer(raw);
+          if (visible.length > emittedLen) {
+            emit({ type: "delta", text: visible.slice(emittedLen) });
+            emittedLen = visible.length;
+          }
+        } else if (obj.error) {
+          emit({ type: "error", error: String(obj.error) });
+        }
+      };
+
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? ""; // keep the incomplete trailing line
+          for (const line of lines) handleLine(line);
+        }
+        if (buf.trim()) handleLine(buf); // flush any trailing line
+
+        // Render the finished answer to sanitized HTML once (strips raw HTML
+        // the LLM may emit), and send final references + stats.
+        const answer = visibleAnswer(raw);
+        const html = answer
+          ? await renderMarkdown(answer, undefined, { safe: true })
+          : "";
+        emit({
+          type: "done",
+          html,
+          references,
+          stats: {
+            responseTimeMs: Date.now() - startedAt,
+            responseChars: answer.length,
+            approxOutputTokens: Math.round(answer.length / 4),
+            sourcesCount: references.length,
+          },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[chat] Stream relay failed:", msg);
+        try {
+          emit({ type: "error", error: msg });
+        } catch {
+          // stream already torn down
+        }
+      } finally {
+        clearTimeout(timeout);
+        ctrl.close();
+      }
+    },
+    cancel() {
+      controller.abort();
+      clearTimeout(timeout);
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store, no-transform",
+      // Discourage proxy buffering so chunks reach the client promptly.
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
