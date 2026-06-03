@@ -9,6 +9,7 @@ export default function BranchSwitcher() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -35,6 +36,33 @@ export default function BranchSwitcher() {
     await update({ branchName: branch });
     router.refresh();
     setSwitching(false);
+  }
+
+  // Fetch the archive ourselves (rather than a plain <a download>) so we can
+  // show a spinner while the server builds the zip and revert once it's ready.
+  async function downloadArchive() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/download/archive");
+      if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const filename =
+        /filename="?([^"]+)"?/.exec(cd)?.[1] ?? `${current}.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[projectpages] Archive download failed:", err);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
@@ -101,19 +129,24 @@ export default function BranchSwitcher() {
 
         {/* Download the current branch's documentation as a zip. The server
             resolves the branch from the session, so no query param is needed. */}
-        <a
-          href="/api/download/archive"
-          download
+        <button
+          type="button"
+          onClick={downloadArchive}
+          disabled={downloading}
           aria-label="Download entire repository"
+          aria-busy={downloading}
           title="Download entire repository"
           style={{
             display: "flex",
             alignItems: "center",
+            background: "none",
+            border: "none",
             padding: "0 0.6rem",
             color: "rgba(255,255,255,0.7)",
-            cursor: "pointer",
+            cursor: downloading ? "default" : "pointer",
           }}
           onMouseEnter={(e) => {
+            if (downloading) return;
             e.currentTarget.style.background = "rgba(255,255,255,0.08)";
             e.currentTarget.style.color = "rgba(255,255,255,0.95)";
           }}
@@ -122,19 +155,39 @@ export default function BranchSwitcher() {
             e.currentTarget.style.color = "rgba(255,255,255,0.7)";
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            style={{ flexShrink: 0 }}
-            aria-hidden="true"
-          >
-            {/* download icon: arrow into tray */}
-            <path d="M8 1a.75.75 0 0 1 .75.75v6.69l1.97-1.97a.75.75 0 1 1 1.06 1.06L8.53 10.78a.75.75 0 0 1-1.06 0L4.22 7.53a.75.75 0 0 1 1.06-1.06l1.97 1.97V1.75A.75.75 0 0 1 8 1z" />
-            <path d="M2.5 9.75a.75.75 0 0 1 .75.75v2.25c0 .138.112.25.25.25h9a.25.25 0 0 0 .25-.25V10.5a.75.75 0 0 1 1.5 0v2.25A1.75 1.75 0 0 1 12.5 14.5h-9A1.75 1.75 0 0 1 1.75 12.75V10.5a.75.75 0 0 1 .75-.75z" />
-          </svg>
-        </a>
+          {downloading ? (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{
+                flexShrink: 0,
+                transformOrigin: "center",
+                animation: "branch-dl-spin 0.7s linear infinite",
+              }}
+              aria-hidden="true"
+            >
+              {/* spinner: faint track + leading arc */}
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25" />
+              <path d="M8 2a6 6 0 0 1 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <style>{`@keyframes branch-dl-spin { to { transform: rotate(360deg); } }`}</style>
+            </svg>
+          ) : (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              style={{ flexShrink: 0 }}
+              aria-hidden="true"
+            >
+              {/* download icon: arrow into tray */}
+              <path d="M8 1a.75.75 0 0 1 .75.75v6.69l1.97-1.97a.75.75 0 1 1 1.06 1.06L8.53 10.78a.75.75 0 0 1-1.06 0L4.22 7.53a.75.75 0 0 1 1.06-1.06l1.97 1.97V1.75A.75.75 0 0 1 8 1z" />
+              <path d="M2.5 9.75a.75.75 0 0 1 .75.75v2.25c0 .138.112.25.25.25h9a.25.25 0 0 0 .25-.25V10.5a.75.75 0 0 1 1.5 0v2.25A1.75 1.75 0 0 1 12.5 14.5h-9A1.75 1.75 0 0 1 1.75 12.75V10.5a.75.75 0 0 1 .75-.75z" />
+            </svg>
+          )}
+        </button>
       </div>
 
       {open && branches.length > 1 && (
