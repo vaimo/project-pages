@@ -1,6 +1,29 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+
+/**
+ * Lightweight client-side Markdown render for the *streaming* preview only, so
+ * the answer is formatted as it arrives instead of showing raw `**` / `###`.
+ * The text comes from the LLM, so it is always sanitized. When the stream
+ * finishes, this is replaced by the server-rendered HTML (which additionally
+ * does syntax highlighting, mermaid, and heading anchors).
+ */
+function renderStreamingHtml(markdownText: string): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = marked.parse(markdownText, {
+      async: false,
+      gfm: true,
+      breaks: false,
+    }) as string;
+    return DOMPurify.sanitize(raw);
+  } catch {
+    return "";
+  }
+}
 
 interface Reference {
   reference_id?: string;
@@ -67,17 +90,31 @@ export default function ChatMessage({ message }: { message: Message }) {
 function AssistantBody({ message }: { message: Message }) {
   const html = message.html;
   const streaming = message.streaming;
+
+  // Format the in-flight answer on the client so it reads as Markdown while it
+  // streams. Recomputed per chunk; marked + sanitize is fast for chat-sized text.
+  const previewHtml = useMemo(
+    () => (streaming && message.content ? renderStreamingHtml(message.content) : ""),
+    [streaming, message.content],
+  );
+
   return (
     <>
       {html ? (
-        // Formatted answer, shown once streaming completes.
+        // Final, authoritative server-rendered answer.
         <div
           className="prose"
           style={{ maxWidth: "100%" }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
+      ) : streaming && previewHtml ? (
+        // Live, progressively-formatted answer while streaming.
+        <div className="prose" style={{ maxWidth: "100%" }}>
+          <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <StreamingCaret />
+        </div>
       ) : (
-        // Live text while streaming (or plain fallback if HTML is unavailable).
+        // Fallback: plain text (e.g. before the first formattable chunk).
         <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
           {message.content}
           {streaming && <StreamingCaret />}
