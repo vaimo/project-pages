@@ -142,3 +142,20 @@ exclude:                           # Optional.
   - "drafts/**"
   - "**/*.env"
   - ".github/**"
+
+# --- LightRAG indexing control ----------------------------------------------
+# Optional. Controls which files the LightRAG chat backend INDEXES (separate
+# from the include/exclude above, which control what Project Pages DISPLAYS).
+# Read by the LightRAG refresh sidecar's prepare_data.py; Project Pages ignores
+# this key. Omit the whole block to use the indexer's built-in default set.
+# Gitignore-style globs: "/x" anchors to root, "**" matches any depth,
+# "folder/**" matches a whole subtree. See docs/configuration.md#indexing.
+indexing:
+  include:                         # Allowlist. Omit to use the indexer default.
+    - "**/*.md"
+    - "**/*.csv"
+  exclude:                         # Denylist, applied after include.
+    - "additional_info/**"         # whole folder
+    - "presentations-and-workshops/**"
+    # - "research/raw-dumps/**"    # a subfolder within an included folder
+    # - "**/*-DRAFT.md"            # by filename pattern, any depth

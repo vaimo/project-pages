@@ -48,6 +48,16 @@ include:
 exclude:
   - "drafts/**"
   - ".github/**"
+
+# Consumed by the LightRAG chat backend's indexing pipeline, NOT by Project
+# Pages itself. Controls which files are ingested into the knowledge base.
+indexing:
+  include:
+    - "**/*.md"
+    - "**/*.csv"
+  exclude:
+    - "additional_info/**"
+    - "presentations-and-workshops/**"
 ```
 
 ---
@@ -124,9 +134,86 @@ Opt-in conversational interface over the documentation. When enabled, a **Chat**
 
 Shared chat settings (API key, query mode, language instruction, timeout) live in environment variables — see [Deployment → Environment Variables](./deployment.md#environment-variables).
 
+### `indexing`
+
+Controls which files the **LightRAG chat backend ingests into its knowledge
+base**. This is a separate concern from the top-level `include`/`exclude`,
+which govern what Project Pages *displays*:
+
+| | `include` / `exclude` (top level) | `indexing.include` / `indexing.exclude` |
+|---|---|---|
+| Controls | What the docs site **shows** | What the chat backend **indexes** |
+| Read by | Project Pages | The LightRAG refresh sidecar's `prepare_data.py` |
+| If omitted | `include` is required | Falls back to the indexer's built-in default (root docs + its known content folders) |
+
+Keeping them separate lets the two diverge — e.g. display a polished draft in
+the docs site without indexing it, or index internal notes you don't surface
+in the UI. Project Pages ignores the `indexing` key entirely (it isn't
+validated), so adding it never affects the site.
+
+| Field | Required | Description |
+|---|---|---|
+| `indexing.include` | No | Allowlist of gitignore-style globs. Only matching files are eligible to index. Omit to use the indexer's default set. |
+| `indexing.exclude` | No | Denylist applied after `include`. Matching files are never indexed. |
+
+**Resolution order** (per file): the indexer's always-skip rules first (VCS
+internals, the config file, `*-condensed.md`, `*.log`), then the file must
+match `include`, then it must not match `exclude`.
+
+**Glob semantics** (gitignore / gitwildmatch):
+
+| Pattern | Matches |
+|---|---|
+| `/*.md` | `.md` files in the repo **root only** (leading `/` anchors) |
+| `**/*.md` | `.md` files at **any** depth |
+| `folder/**` | everything under `folder/` (the whole subtree) |
+| `folder/sub/**` | everything under just that subfolder |
+| `**/*-DRAFT.md` | any file ending `-DRAFT.md`, anywhere |
+
+**Common recipes:**
+
+```yaml
+# 1. Denylist — index everything, exclude two working folders
+indexing:
+  include: ["**/*.md", "**/*.csv"]
+  exclude:
+    - "additional_info/**"
+    - "presentations-and-workshops/**"
+
+# 2. Allowlist — index ONLY specific folders
+indexing:
+  include:
+    - "/*.md"                 # root docs
+    - "transcripts/**"
+    - "deliverables/**"
+
+# 3. Include a folder but carve out a subfolder inside it
+indexing:
+  include: ["**/*.md", "**/*.csv", "research/**"]
+  exclude: ["research/raw-dumps/**"]   # keep the folder, drop one subtree
+
+# 4. Index a folder except its drafts, by filename pattern
+indexing:
+  include: ["**/*.md"]
+  exclude:
+    - "**/*-DRAFT.md"
+    - "**/_scratch/**"
+```
+
+**Live de-indexing:** because the sidecar diffs each run against the previously
+indexed set, *adding* an exclude for content that was already indexed removes it
+from the knowledge base on the next push — no manual cleanup. Likewise, widening
+`include` indexes the newly-eligible files on the next push.
+
+> Requires the LightRAG chat backend + refresh sidecar deployment (the
+> `branches[].chat.backendUrl` target). Without it, this section is inert.
+
 ---
 
 ## Path Resolution Rules
+
+These apply to the top-level `include` / `exclude` (what Project Pages displays).
+The `indexing` section follows the same glob syntax — see [`indexing`](#indexing).
 
 1. Patterns use standard glob syntax (same as `.gitignore`).
 2. `include` is evaluated first — a file must match at least one pattern to be considered.
