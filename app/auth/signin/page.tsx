@@ -146,7 +146,7 @@ function SignInForm() {
         {ENABLE_GOOGLE && (
           <div style={{ textAlign: "center", marginTop: "1rem" }}>
             <button
-              onClick={() => signIn("google")}
+              onClick={() => signIn("google", { callbackUrl })}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
