@@ -2,6 +2,8 @@
 
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
+
+const ENABLE_GOOGLE = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN === "true" || process.env.NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN === "1";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 
@@ -140,6 +142,27 @@ function SignInForm() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        {ENABLE_GOOGLE && (
+          <div style={{ textAlign: "center", marginTop: "1rem" }}>
+            <button
+              onClick={() => signIn("google")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.6rem 1rem",
+                borderRadius: "4px",
+                border: "1px solid var(--color-grey-300)",
+                background: "var(--color-white)",
+                cursor: "pointer",
+              }}
+            >
+              <img src="/google-mark.svg" alt="Google" width={20} height={20} />
+              <span style={{ fontWeight: 600 }}>Sign in with Google</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
