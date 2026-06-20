@@ -7,7 +7,9 @@
 
 - [x] 2.1 Add auth routes: /auth/google and /auth/google/callback behind ENABLE_GOOGLE_LOGIN guard
 - [x] 2.2 Implement Google strategy: verify callback checks email domain against GOOGLE_ALLOWED_DOMAIN
-- [ ] 2.3 Create or find user on successful auth; set google_id on user record and mark google_auth=true
+- [x] 2.3 Create or find user on successful auth; set google_id on user record and mark google_auth=true
+
+> Note: This change implements session-only identity. Google identity (google_id, email) is attached to the NextAuth session/jwt but no persistent user record is created, per project decision.
 - [x] 2.4 Reuse existing session/JWT issuance so Google-authenticated users receive same tokens/cookies
 - [ ] 2.5 Add unit/integration tests for allowed and disallowed domains
 
