@@ -49,7 +49,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            NEXT_PUBLIC_DEBUG_MODE=${{ vars.NEXT_PUBLIC_DEBUG_MODE }}
-            NEXT_PUBLIC_SHOW_SPREADSHEET=${{ vars.NEXT_PUBLIC_SHOW_SPREADSHEET }}
-            NEXT_PUBLIC_SHOW_SLACK_HUB=${{ vars.NEXT_PUBLIC_SHOW_SLACK_HUB }}
             NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN=${{ vars.NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN }}
