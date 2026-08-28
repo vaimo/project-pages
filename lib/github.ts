@@ -41,7 +41,7 @@ export async function getConfig(): Promise<ParsedConfig> {
   const localPath = process.env.PROJECTPAGES_LOCAL_CONFIG;
   if (localPath) {
     const raw = await readFile(localPath, "utf-8");
-    const config = parseConfig(raw);
+    const config = await maybeDiscoverBranches(parseConfig(raw));
     _configCache = { config, fetchedAt: now };
     return config;
   }
@@ -63,7 +63,9 @@ export async function getConfig(): Promise<ParsedConfig> {
 
       if (Array.isArray(data) || data.type !== "file") continue;
 
-      const config = parseConfig(Buffer.from(data.content, "base64").toString("utf-8"));
+      const config = await maybeDiscoverBranches(
+        parseConfig(Buffer.from(data.content, "base64").toString("utf-8")),
+      );
       _configCache = { config, fetchedAt: now };
       return config;
     } catch (err) {
@@ -77,6 +79,43 @@ export async function getConfig(): Promise<ParsedConfig> {
 /** Invalidate the in-memory config cache (called by the webhook handler). */
 export function invalidateConfigCache(): void {
   _configCache = null;
+}
+
+/**
+ * If the parsed config declares `discoverBranches: true`, ask GitHub for the
+ * repo's full branch list and merge them into `config.branches`. Explicitly
+ * declared branches keep their permissions/comments/chat settings; discovered
+ * branches inherit from the first explicit entry as a template.
+ *
+ * Fails soft — if the API call errors, we log and return the config unchanged
+ * so the app still works with whatever's declared.
+ */
+async function maybeDiscoverBranches(config: ParsedConfig): Promise<ParsedConfig> {
+  if (!config.discoverBranches) return config;
+
+  const { owner, repo } = getDocsRepo();
+  const template = config.branches[0];
+  if (!template) return config;
+
+  try {
+    const declaredNames = new Set(config.branches.map((b) => b.name));
+    const remoteBranches: { name: string }[] = await octokit().paginate(
+      octokit().repos.listBranches,
+      { owner, repo, per_page: 100 },
+    );
+    const extras = remoteBranches
+      .filter((b) => !declaredNames.has(b.name))
+      .map((b) => ({
+        name: b.name,
+        userGroups: template.userGroups,
+        comments: { enabled: template.comments.enabled },
+        chat: { backendUrl: template.chat.backendUrl },
+      }));
+    return { ...config, branches: [...config.branches, ...extras] };
+  } catch (err) {
+    console.warn("[projectpages] Auto-branch discovery failed; falling back to declared branches only.", err);
+    return config;
+  }
 }
 
 // ── File tree ─────────────────────────────────────────────────────────────
