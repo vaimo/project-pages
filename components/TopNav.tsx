@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import BranchSwitcher from "./BranchSwitcher";
 import SectionTabs from "./SectionTabs";
@@ -48,68 +49,37 @@ export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }:
         </svg>
       </button>
 
-      {/* Monogram — V mark on an ochre disc */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+      {/* Vaimo logo (dark) + serif site title, separated by a hairline slash */}
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <Image
+          src="/vaimo-logo-dark.png"
+          alt="Vaimo"
+          width={280}
+          height={80}
+          priority
+          style={{ height: "28px", width: "auto", display: "block" }}
+        />
         <span
           aria-hidden
           style={{
-            width: "34px",
-            height: "34px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "var(--color-ink-90)",
-            color: "var(--color-paper)",
-            borderRadius: "50%",
+            display: "inline-block",
+            width: "1px",
+            height: "22px",
+            background: "var(--color-rule)",
+          }}
+        />
+        <span
+          style={{
             fontFamily: "var(--font-serif)",
-            fontVariationSettings: '"opsz" 144, "SOFT" 20',
+            fontVariationSettings: '"opsz" 36, "SOFT" 20',
             fontWeight: 500,
-            fontSize: "1.1rem",
-            letterSpacing: "0",
-            position: "relative",
+            fontSize: "1.05rem",
+            color: "var(--color-ink-90)",
+            letterSpacing: "-0.01em",
           }}
         >
-          V
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              bottom: "3px",
-              right: "3px",
-              width: "6px",
-              height: "6px",
-              background: "var(--color-accent)",
-              borderRadius: "50%",
-            }}
-          />
+          {siteTitle}
         </span>
-        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "0.6rem",
-              fontWeight: 500,
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-              color: "var(--color-ink-40)",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Vaimo · Project Pages
-          </span>
-          <span
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontVariationSettings: '"opsz" 36, "SOFT" 20',
-              fontWeight: 500,
-              fontSize: "1.05rem",
-              color: "var(--color-ink-90)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {siteTitle}
-          </span>
-        </div>
       </div>
 
       <div style={{ flex: 1 }} />

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 
 const ENABLE_GOOGLE = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN === "true" || process.env.NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN === "1";
@@ -51,28 +52,24 @@ function SignInForm() {
         <div style={{ position: "absolute", top: "50%", right: "-40%", width: "80%", height: "1px", background: "var(--color-accent)", opacity: 0.4, transform: "rotate(-8deg)" }} />
         <div style={{ position: "absolute", bottom: "12%", left: "-15%", width: "50%", height: "1px", background: "var(--color-rule)", opacity: 0.3 }} />
 
-        <header style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <Image
+            src="/vaimo-logo-white.svg"
+            alt="Vaimo"
+            width={140}
+            height={51}
+            priority
+            style={{ height: "36px", width: "auto", display: "block" }}
+          />
           <span
             aria-hidden
             style={{
-              width: "40px",
-              height: "40px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "var(--color-paper)",
-              color: "var(--color-ink-90)",
-              borderRadius: "50%",
-              fontFamily: "var(--font-serif)",
-              fontVariationSettings: '"opsz" 144, "SOFT" 30',
-              fontWeight: 500,
-              fontSize: "1.3rem",
-              position: "relative",
+              display: "inline-block",
+              width: "1px",
+              height: "26px",
+              background: "rgba(251, 247, 236, 0.28)",
             }}
-          >
-            V
-            <span style={{ position: "absolute", bottom: "4px", right: "4px", width: "7px", height: "7px", background: "var(--color-accent)", borderRadius: "50%" }} />
-          </span>
+          />
           <span
             style={{
               fontFamily: "var(--font-sans)",
@@ -80,10 +77,10 @@ function SignInForm() {
               fontWeight: 500,
               letterSpacing: "0.32em",
               textTransform: "uppercase",
-              color: "rgba(251, 247, 236, 0.65)",
+              color: "rgba(251, 247, 236, 0.55)",
             }}
           >
-            Vaimo · Project Pages
+            Project Pages
           </span>
         </header>
 
