@@ -1,5 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import { cache } from "react";
+import { readFile } from "fs/promises";
 import { parseConfig, filterPaths, type ParsedConfig } from "./config";
 
 let _octokit: Octokit | null = null;
@@ -35,6 +36,14 @@ export async function getConfig(): Promise<ParsedConfig> {
   const now = Date.now();
   if (_configCache && now - _configCache.fetchedAt < CONFIG_TTL_MS) {
     return _configCache.config;
+  }
+
+  const localPath = process.env.PROJECTPAGES_LOCAL_CONFIG;
+  if (localPath) {
+    const raw = await readFile(localPath, "utf-8");
+    const config = parseConfig(raw);
+    _configCache = { config, fetchedAt: now };
+    return config;
   }
 
   const { owner, repo } = getDocsRepo();

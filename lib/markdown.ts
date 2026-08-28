@@ -1,4 +1,5 @@
 import path from "path";
+import matter from "gray-matter";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
@@ -9,6 +10,12 @@ import { visit } from "unist-util-visit";
 import type { Comment } from "./supabase";
 
 export interface OutlineHeading { level: number; id: string; text: string; }
+export type Frontmatter = Record<string, unknown>;
+
+export interface RenderedMarkdown {
+  html: string;
+  frontmatter: Frontmatter | null;
+}
 
 function decodeEntities(s: string): string {
   return s
@@ -112,7 +119,38 @@ export async function renderMarkdown(
   filePath?: string,
   options?: RenderMarkdownOptions,
 ): Promise<string> {
+  return (await renderMarkdownWithFrontmatter(raw, filePath, options)).html;
+}
+
+export async function renderMarkdownWithFrontmatter(
+  raw: string,
+  filePath?: string,
+  options?: RenderMarkdownOptions,
+): Promise<RenderedMarkdown> {
   const allowDangerousHtml = options?.safe !== true;
+
+  let body = raw;
+  let frontmatter: Frontmatter | null = null;
+  try {
+    const parsed = matter(raw);
+    body = parsed.content;
+    if (parsed.data && Object.keys(parsed.data).length > 0) {
+      frontmatter = parsed.data as Frontmatter;
+    }
+  } catch {
+    body = raw;
+  }
+
+  // When the frontmatter provides a title, strip a leading H1 from the body if
+  // it matches (case-insensitively, ignoring whitespace) — avoids the duplicate
+  // "Title / Title" that most feature-overview docs would otherwise render.
+  if (frontmatter && typeof frontmatter.title === "string") {
+    const fmTitle = frontmatter.title.trim().toLowerCase();
+    body = body.replace(/^\s*#\s+(.+?)\s*$/m, (match, heading: string) => {
+      return heading.trim().toLowerCase() === fmTitle ? "" : match;
+    });
+  }
+
   const pipeline = remark()
     .use(remarkGfm)
     .use(remarkRehype, { allowDangerousHtml })
@@ -124,9 +162,9 @@ export async function renderMarkdown(
   const result = await pipeline
     .use(rehypeHighlight)
     .use(rehypeStringify, { allowDangerousHtml })
-    .process(raw);
+    .process(body);
 
-  return result.toString();
+  return { html: result.toString(), frontmatter };
 }
 
 /**

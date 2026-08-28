@@ -1,7 +1,6 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import Image from "next/image";
 import BranchSwitcher from "./BranchSwitcher";
 import SectionTabs from "./SectionTabs";
 
@@ -16,15 +15,16 @@ export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }:
     <header
       style={{
         height: "var(--nav-height)",
-        background: "var(--color-grey-900)",
-        borderBottom: "none",
+        background: "var(--color-paper)",
+        borderBottom: "1px solid var(--color-rule)",
         display: "flex",
         alignItems: "center",
-        padding: "0 1.5rem",
+        padding: "0 1.75rem",
         gap: "1rem",
         position: "sticky",
         top: 0,
         zIndex: 100,
+        backdropFilter: "saturate(140%) blur(8px)",
       }}
     >
       {/* Mobile hamburger */}
@@ -37,7 +37,7 @@ export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }:
           border: "none",
           cursor: "pointer",
           padding: "0.25rem",
-          color: "rgba(255,255,255,0.7)",
+          color: "var(--color-ink-70)",
         }}
         className="mobile-menu-btn"
       >
@@ -48,28 +48,69 @@ export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }:
         </svg>
       </button>
 
-      <Image src="/vaimo-logo-white.png" alt="Vaimo" width={120} height={32} priority />
-
-      <span
-        style={{
-          color: "rgba(255,255,255,0.3)",
-          fontWeight: 300,
-          fontSize: "1.25rem",
-          userSelect: "none",
-        }}
-      >
-        /
-      </span>
-
-      <span
-        style={{
-          fontWeight: 500,
-          color: "rgba(255,255,255,0.85)",
-          fontSize: "0.9375rem",
-        }}
-      >
-        {siteTitle}
-      </span>
+      {/* Monogram — V mark on an ochre disc */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+        <span
+          aria-hidden
+          style={{
+            width: "34px",
+            height: "34px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "var(--color-ink-90)",
+            color: "var(--color-paper)",
+            borderRadius: "50%",
+            fontFamily: "var(--font-serif)",
+            fontVariationSettings: '"opsz" 144, "SOFT" 20',
+            fontWeight: 500,
+            fontSize: "1.1rem",
+            letterSpacing: "0",
+            position: "relative",
+          }}
+        >
+          V
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              bottom: "3px",
+              right: "3px",
+              width: "6px",
+              height: "6px",
+              background: "var(--color-accent)",
+              borderRadius: "50%",
+            }}
+          />
+        </span>
+        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
+          <span
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "0.6rem",
+              fontWeight: 500,
+              letterSpacing: "0.28em",
+              textTransform: "uppercase",
+              color: "var(--color-ink-40)",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Vaimo · Project Pages
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontVariationSettings: '"opsz" 36, "SOFT" 20',
+              fontWeight: 500,
+              fontSize: "1.05rem",
+              color: "var(--color-ink-90)",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {siteTitle}
+          </span>
+        </div>
+      </div>
 
       <div style={{ flex: 1 }} />
 
@@ -80,14 +121,21 @@ export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }:
       <button
         onClick={() => signOut({ callbackUrl: "/auth/signin" })}
         style={{
-          background: "none",
-          border: "1px solid rgba(255,255,255,0.25)",
-          borderRadius: "4px",
-          padding: "0.35rem 0.85rem",
-          fontSize: "0.875rem",
-          color: "rgba(255,255,255,0.7)",
+          background: "transparent",
+          border: "1px solid var(--color-rule)",
+          borderRadius: "2px",
+          padding: "0.45rem 0.95rem",
+          fontSize: "0.75rem",
+          fontFamily: "var(--font-sans)",
+          fontWeight: 500,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "var(--color-ink-70)",
           cursor: "pointer",
+          transition: "border-color 0.15s, color 0.15s",
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-ink-90)"; e.currentTarget.style.color = "var(--color-ink-90)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-rule)"; e.currentTarget.style.color = "var(--color-ink-70)"; }}
       >
         Sign out
       </button>

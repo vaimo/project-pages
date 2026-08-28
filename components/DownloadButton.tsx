@@ -23,17 +23,23 @@ export default function DownloadButton({ filePath, withComments = false, withMed
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: "0.4rem",
-        padding: "0.45rem 1rem",
-        background: withComments ? "var(--color-grey-900)" : "var(--color-yellow)",
-        color: withComments ? "var(--color-white)" : "var(--color-grey-900)",
-        border: "none",
-        borderRadius: "4px",
-        fontSize: "0.875rem",
+        gap: "0.45rem",
+        padding: "0.55rem 0.95rem",
+        background: withComments ? "var(--color-ink-90)" : "transparent",
+        color: withComments ? "var(--color-paper)" : "var(--color-ink-90)",
+        border: `1px solid ${withComments ? "var(--color-ink-90)" : "var(--color-rule)"}`,
+        borderRadius: "2px",
+        fontSize: "0.6875rem",
+        fontFamily: "var(--font-sans)",
         fontWeight: 600,
+        letterSpacing: "0.16em",
+        textTransform: "uppercase",
         textDecoration: "none",
         cursor: "pointer",
+        transition: "border-color 0.15s, background 0.15s",
       }}
+      onMouseEnter={(e) => { if (!withComments) e.currentTarget.style.borderColor = "var(--color-ink-90)"; }}
+      onMouseLeave={(e) => { if (!withComments) e.currentTarget.style.borderColor = "var(--color-rule)"; }}
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
         <path d="M7 1v7.586l2.293-2.293 1.414 1.414L7 11.414l-3.707-3.707 1.414-1.414L7 8.586V1h0z" />

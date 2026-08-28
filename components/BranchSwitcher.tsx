@@ -71,10 +71,11 @@ export default function BranchSwitcher() {
         style={{
           display: "flex",
           alignItems: "stretch",
-          border: "1px solid rgba(255,255,255,0.25)",
-          borderRadius: "4px",
+          border: "1px solid var(--color-rule)",
+          borderRadius: "2px",
           overflow: "hidden",
           whiteSpace: "nowrap",
+          background: "transparent",
         }}
       >
         <button
@@ -82,12 +83,16 @@ export default function BranchSwitcher() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "0.4rem",
+            gap: "0.45rem",
             background: "none",
             border: "none",
-            padding: "0.35rem 0.7rem",
-            fontSize: "0.8125rem",
-            color: "rgba(255,255,255,0.7)",
+            padding: "0.45rem 0.85rem",
+            fontFamily: "var(--font-sans)",
+            fontSize: "0.7rem",
+            fontWeight: 500,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--color-ink-70)",
             cursor: "pointer",
             whiteSpace: "nowrap",
           }}
@@ -99,13 +104,15 @@ export default function BranchSwitcher() {
             height="12"
             viewBox="0 0 16 16"
             fill="currentColor"
-            style={{ opacity: 0.6, flexShrink: 0 }}
+            style={{ opacity: 0.7, flexShrink: 0 }}
           >
-            {/* branch icon */}
             <path d="M11.75 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 13.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM4.25 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5zM5 5.5v5" />
             <path d="M5 5.5A3.5 3.5 0 0 0 8.5 9H10" stroke="currentColor" strokeWidth="1.5" fill="none" />
           </svg>
-          <span>Branch: <strong style={{ color: "rgba(255,255,255,0.9)" }}>{switching ? "…" : current}</strong></span>
+          <span style={{ display: "inline-flex", gap: "0.4rem", alignItems: "baseline" }}>
+            <span style={{ color: "var(--color-ink-40)" }}>Branch</span>
+            <strong style={{ color: "var(--color-ink-90)", fontFamily: "var(--font-mono)", fontWeight: 600, letterSpacing: "0.06em", textTransform: "none" }}>{switching ? "…" : current}</strong>
+          </span>
           {branches.length > 1 && (
             <svg
               width="10"
@@ -124,11 +131,8 @@ export default function BranchSwitcher() {
           )}
         </button>
 
-        {/* Divider between the branch label and the download action */}
-        <span style={{ width: 1, background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />
+        <span style={{ width: 1, background: "var(--color-rule)", flexShrink: 0 }} />
 
-        {/* Download the current branch's documentation as a zip. The server
-            resolves the branch from the session, so no query param is needed. */}
         <button
           type="button"
           onClick={downloadArchive}
@@ -141,18 +145,18 @@ export default function BranchSwitcher() {
             alignItems: "center",
             background: "none",
             border: "none",
-            padding: "0 0.6rem",
-            color: "rgba(255,255,255,0.7)",
+            padding: "0 0.65rem",
+            color: "var(--color-ink-70)",
             cursor: downloading ? "default" : "pointer",
           }}
           onMouseEnter={(e) => {
             if (downloading) return;
-            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.95)";
+            e.currentTarget.style.background = "var(--color-paper-alt)";
+            e.currentTarget.style.color = "var(--color-ink-90)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "none";
-            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+            e.currentTarget.style.color = "var(--color-ink-70)";
           }}
         >
           {downloading ? (
@@ -197,11 +201,11 @@ export default function BranchSwitcher() {
             position: "absolute",
             top: "calc(100% + 6px)",
             right: 0,
-            minWidth: "160px",
-            background: "var(--color-grey-900)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: "4px",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            minWidth: "180px",
+            background: "var(--color-card)",
+            border: "1px solid var(--color-rule)",
+            borderRadius: "2px",
+            boxShadow: "0 20px 40px rgba(15, 14, 11, 0.12)",
             overflow: "hidden",
             zIndex: 200,
           }}
@@ -215,25 +219,26 @@ export default function BranchSwitcher() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "0.5rem",
+                gap: "0.55rem",
                 width: "100%",
-                padding: "0.55rem 0.85rem",
-                background: branch === current ? "rgba(255,255,255,0.08)" : "none",
+                padding: "0.6rem 0.9rem",
+                background: branch === current ? "var(--color-accent-tint)" : "transparent",
                 border: "none",
-                color: branch === current ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.65)",
-                fontSize: "0.875rem",
+                color: branch === current ? "var(--color-ink-90)" : "var(--color-ink-70)",
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.8125rem",
                 cursor: branch === current ? "default" : "pointer",
                 textAlign: "left",
               }}
               onMouseEnter={(e) => {
-                if (branch !== current) (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)";
+                if (branch !== current) (e.currentTarget as HTMLButtonElement).style.background = "var(--color-paper-alt)";
               }}
               onMouseLeave={(e) => {
-                if (branch !== current) (e.currentTarget as HTMLButtonElement).style.background = "none";
+                if (branch !== current) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
               }}
             >
               {branch === current && (
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style={{ color: "var(--color-yellow)", flexShrink: 0 }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style={{ color: "var(--color-accent-ink)", flexShrink: 0 }}>
                   <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}

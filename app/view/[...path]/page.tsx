@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { buildAuthOptions } from "@/lib/auth";
 import { getFilteredTree, getFileContent } from "@/lib/github";
-import { renderMarkdown, extractHeadings } from "@/lib/markdown";
+import { renderMarkdown, renderMarkdownWithFrontmatter, extractHeadings } from "@/lib/markdown";
 import { convertDocxToHtml } from "@/lib/docx";
 import { parse as parseCsv } from "csv-parse/sync";
 import MarkdownView from "@/components/FileView/MarkdownView";
@@ -58,9 +58,9 @@ export default async function ViewPage({ params }: Props) {
   } else if (MD_EXTS.has(ext)) {
     const raw = rawBuffer.toString("utf-8");
     hasRelativeImages = /!\[[^\]]*\]\((?!https?:\/\/)(?!data:)[^\s)]+/.test(raw);
-    const html = await renderMarkdown(raw, filePath);
+    const { html, frontmatter } = await renderMarkdownWithFrontmatter(raw, filePath);
     const headings = extractHeadings(html);
-    content = <MarkdownView html={html} filePath={filePath} commentsEnabled={commentsEnabled} headings={headings} />;
+    content = <MarkdownView html={html} filePath={filePath} commentsEnabled={commentsEnabled} headings={headings} frontmatter={frontmatter} />;
   } else if (ext === "json") {
     const raw = rawBuffer.toString("utf-8");
     let formatted: string;
@@ -132,31 +132,60 @@ export default async function ViewPage({ params }: Props) {
 
   return (
     <>
-      <main style={{ flex: 1, padding: "1.5rem 2rem", overflowY: "auto", minWidth: 0 }}>
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" style={{ marginBottom: "1.25rem", fontSize: "0.875rem", color: "var(--color-grey-500)" }}>
-          <span style={{ color: "var(--color-grey-700)" }}>Home</span>
-          {breadcrumbs.map((part, i) => {
-            const isLast = i === breadcrumbs.length - 1;
-            return (
-              <span key={i}>
-                <span style={{ margin: "0 0.35rem" }}>/</span>
-                <span style={{ color: isLast ? "var(--color-grey-900)" : "var(--color-grey-700)", fontWeight: isLast ? 500 : 400 }}>{part}</span>
-              </span>
-            );
-          })}
-        </nav>
+      <main style={{ flex: 1, padding: "1.5rem 2.5rem 4rem", overflowY: "auto", minWidth: 0 }}>
+        {/* Top row — breadcrumb (left) + updated · author + downloads (right) */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+            flexWrap: "wrap",
+            marginBottom: "2rem",
+          }}
+        >
+          <nav
+            aria-label="Breadcrumb"
+            className="eyebrow"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.4rem",
+              fontSize: "0.625rem",
+              minWidth: 0,
+            }}
+          >
+            <span style={{ color: "var(--color-ink-70)" }}>Home</span>
+            {breadcrumbs.map((part, i) => {
+              const isLast = i === breadcrumbs.length - 1;
+              const label = part.replace(/\.(md|mdx)$/i, "").split(/[_\-.]+/).filter(Boolean).map((w) => (/[A-Z]/.test(w) ? w : w[0].toUpperCase() + w.slice(1))).join(" ");
+              return (
+                <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span style={{ color: "var(--color-rule)" }}>/</span>
+                  <span style={{ color: isLast ? "var(--color-ink-90)" : "var(--color-ink-70)", fontWeight: isLast ? 600 : 500 }}>{label}</span>
+                </span>
+              );
+            })}
+          </nav>
 
-        {/* File metadata bar */}
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h1 style={{ margin: "0 0 0.5rem", fontSize: "1.25rem", fontWeight: 700 }}>{fileName}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
             {file.lastCommit && (
-              <span style={{ fontSize: "0.8125rem", color: "var(--color-grey-500)" }}>
-                Updated {new Date(file.lastCommit.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} · {file.lastCommit.author}
-              </span>
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "0.75rem",
+                  color: "var(--color-ink-40)",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                Updated {new Date(file.lastCommit.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                <span style={{ color: "var(--color-rule)", margin: "0 0.5rem" }}>·</span>
+                <span style={{ color: "var(--color-ink-70)" }}>{file.lastCommit.author}</span>
+              </p>
             )}
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <DownloadButton filePath={filePath} />
               {isExcalidraw && rawContentForClient && (
                 <ExcalidrawPngButton rawContent={rawContentForClient} fileName={fileName} />

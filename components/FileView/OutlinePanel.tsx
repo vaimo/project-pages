@@ -55,7 +55,7 @@ export default function OutlinePanel({ headings }: { headings: OutlineHeading[] 
 
   return (
     <div
-      style={{ position: "fixed", top: "calc(var(--nav-height) + 1rem)", right: "1.5rem", zIndex: 90 }}
+      style={{ position: "fixed", top: "calc(var(--nav-height) + 5rem)", right: "1.5rem", zIndex: 90 }}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -63,15 +63,29 @@ export default function OutlinePanel({ headings }: { headings: OutlineHeading[] 
         <div
           ref={panelRef}
           style={{
-            width: "43vw",
+            width: "min(43vw, 420px)",
             maxHeight: "calc(100vh - var(--nav-height) - 1rem)",
             overflowY: "auto",
-            background: "#e9e9e9",
-            borderRadius: "8px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+            background: "var(--color-card)",
+            border: "1px solid var(--color-rule)",
+            borderRadius: "2px",
+            boxShadow: "0 20px 40px rgba(15, 14, 11, 0.12)",
           }}
         >
-          <div style={{ padding: "0.5rem 0" }}>
+          <div style={{ padding: "0.85rem 0" }}>
+            <p
+              className="eyebrow"
+              style={{
+                margin: "0 0 0.5rem",
+                padding: "0 1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "0.6rem",
+              }}
+            >
+              <span>On this page</span>
+              <span style={{ fontFamily: "var(--font-mono)", opacity: 0.7 }}>{headings.length}</span>
+            </p>
             {headings.map((h, i) => (
               <a
                 key={i}
@@ -81,20 +95,19 @@ export default function OutlinePanel({ headings }: { headings: OutlineHeading[] 
                 className="outline-link"
                 style={{
                   display: "block",
-                  padding: "0.3rem 1rem",
-                  paddingLeft: `calc(0.75rem + ${h.level - 1} * 1rem)`,
+                  padding: "0.35rem 1rem",
+                  paddingLeft: `calc(1rem + ${h.level - 1} * 0.85rem)`,
                   textDecoration: "none",
-                  color: "var(--color-grey-900)",
-                  fontSize: "13px",
+                  color: i === activeIndex ? "var(--color-ink-90)" : "var(--color-ink-70)",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "0.8125rem",
                   fontWeight: h.level === 1 ? 600 : h.level === 2 ? 500 : 400,
-                  lineHeight: 1.4,
-                  // Accent on the RIGHT — away from the main content edge
+                  lineHeight: 1.5,
                   borderRight: i === activeIndex
-                    ? "3px solid var(--color-yellow)"
-                    : "3px solid transparent",
-                  background: i === activeIndex
-                    ? "rgba(245, 196, 0, 0.15)"
-                    : undefined,
+                    ? "2px solid var(--color-accent)"
+                    : "2px solid transparent",
+                  background: i === activeIndex ? "var(--color-accent-tint)" : undefined,
+                  transition: "background 0.15s, color 0.15s",
                 }}
               >
                 {h.text}
@@ -105,18 +118,21 @@ export default function OutlinePanel({ headings }: { headings: OutlineHeading[] 
       ) : (
         <button
           style={{
-            background: "var(--color-grey-100)",
-            border: "1px solid var(--color-grey-300)",
-            borderRadius: "6px",
-            padding: "0.35rem 0.85rem",
-            fontSize: "0.875rem",
-            color: "var(--color-grey-700)",
+            background: "var(--color-card)",
+            border: "1px solid var(--color-rule)",
+            borderRadius: "2px",
+            padding: "0.4rem 0.85rem",
+            fontSize: "0.6875rem",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 600,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "var(--color-ink-70)",
             cursor: "default",
-            fontFamily: "inherit",
             whiteSpace: "nowrap",
           }}
         >
-          Outline
+          ☰ Outline
         </button>
       )}
     </div>

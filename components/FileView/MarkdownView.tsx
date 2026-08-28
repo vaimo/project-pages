@@ -4,13 +4,15 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import CommentForm from "@/components/Comments/CommentForm";
 import MermaidBlock from "./MermaidBlock";
 import OutlinePanel from "./OutlinePanel";
-import type { OutlineHeading } from "@/lib/markdown";
+import Frontmatter from "./Frontmatter";
+import type { OutlineHeading, Frontmatter as FrontmatterType } from "@/lib/markdown";
 
 interface Props {
   html: string;
   filePath: string;
   commentsEnabled?: boolean;
   headings?: OutlineHeading[];
+  frontmatter?: FrontmatterType | null;
 }
 
 type Segment = { type: "html"; content: string } | { type: "mermaid"; code: string };
@@ -38,7 +40,7 @@ function splitMermaid(html: string): Segment[] {
 
 const BLOCK_TAGS = new Set(["P", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "TD", "TH", "BLOCKQUOTE", "DT", "DD"]);
 
-export default function MarkdownView({ html, filePath, commentsEnabled = true, headings = [] }: Props) {
+export default function MarkdownView({ html, filePath, commentsEnabled = true, headings = [], frontmatter = null }: Props) {
   const segments = splitMermaid(html);
   const articleRef = useRef<HTMLElement>(null);
   const [iconY, setIconY] = useState<number | null>(null);
@@ -120,7 +122,8 @@ export default function MarkdownView({ html, filePath, commentsEnabled = true, h
   return (
     <div onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleClick}>
       <OutlinePanel headings={headings} />
-      <article ref={articleRef} className="prose">
+      <article ref={articleRef} className="prose fade-up">
+        {frontmatter && <Frontmatter data={frontmatter} />}
         {segments.map((seg, i) =>
           seg.type === "html" ? (
             <div key={i} dangerouslySetInnerHTML={{ __html: seg.content }} />
