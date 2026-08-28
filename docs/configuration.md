@@ -2,6 +2,8 @@
 
 This YAML file must exist at the root of your documentation repository in the branch(es) configured by `CONFIG_BRANCH` (default: `master,main`). It does **not** need to be present in every content branch — the app reads it from a single designated branch on every request (with a 60-second in-memory cache).
 
+**Local-development shortcut:** set `PROJECTPAGES_LOCAL_CONFIG=/absolute/path/to/config.yaml` and the app reads the config from disk instead of the docs repo. The docs repo can stay clean — nothing has to be committed there. See the [Quick start (local)](../README.md#quick-start-local-no-config-in-the-docs-repository) section of the README.
+
 The repository itself is identified by the `DOCS_REPO` environment variable set in the Project Pages deployment — **not** by anything inside this config file. See [Deployment → DOCS_REPO](./deployment.md#docs_repo) for details.
 
 A ready-to-copy template is provided at [`projectpages.config.example`](../projectpages.config.example) in this repository.
@@ -19,10 +21,17 @@ auth:
   sessionDurationDays: 7
 
 userGroups:
+  # Real passphrases can live here, OR (recommended) in
+  # PROJECTPAGES_PASSPHRASE_<GROUP_NAME> env vars — env wins when set.
   - name: vaimo
-    passphrase: "replace-with-secret"
+    passphrase: ""
   - name: client
-    passphrase: "replace-with-another-secret"
+    passphrase: ""
+
+# Optional: auto-list every branch in DOCS_REPO in addition to the
+# `branches:` entries below. Discovered branches inherit permissions
+# from the first explicit entry (used as a template).
+discoverBranches: true
 
 branches:
   - name: master
@@ -84,9 +93,11 @@ Defines the audiences that can access this portal. At least one entry is require
 | Field | Required | Description |
 |---|---|---|
 | `userGroups[].name` | Yes | Identifier for the group (referenced by branches) |
-| `userGroups[].passphrase` | Yes | Plain-text passphrase that authenticates a user as this group |
+| `userGroups[].passphrase` | Yes | Plain-text passphrase, used only as a fallback when the env var is unset. See below. |
 
-Passphrases must be unique across all groups. Treat this file as a secret.
+Passphrases must be unique across all groups.
+
+**Prefer env-var passphrases.** Because this file lives in the docs repo, plain-text passphrases here are visible to anyone with repo access. Set the real value in a `PROJECTPAGES_PASSPHRASE_<GROUP>` environment variable — env wins when set and non-empty. Group names are upper-cased and non-alphanumerics become underscores (e.g. `vaimo` → `PROJECTPAGES_PASSPHRASE_VAIMO`, `external-partner` → `PROJECTPAGES_PASSPHRASE_EXTERNAL_PARTNER`). Full details in [Authentication → Passphrase source](./authentication.md#passphrase-source-env-override--recommended).
 
 ### `branches`
 
@@ -99,7 +110,19 @@ A list of Git branches that Project Pages can serve. At least one entry is requi
 | `branches[].comments.enabled` | No | Whether inline comments are enabled for this branch. Defaults to `false`. |
 | `branches[].chat.backendUrl` | No | Base URL of the LightRAG-compatible chat service indexed over this branch's content. When present, the **Chat** tab appears in the top nav while this branch is active. Omit to hide chat on this branch. See [Chat](#chat) below for the rationale. |
 
-**How it works:** When a user logs in, the app identifies their group by passphrase, then finds all branches that list that group. The user lands on the first accessible branch. If multiple branches are accessible, a branch switcher appears in the top nav so they can move between them without logging out.
+**How it works:** When a user logs in, the app identifies their group by passphrase, then finds all branches that list that group. The user lands on the first accessible branch. If multiple branches are accessible, a searchable branch switcher appears in the top nav so they can move between them without logging out.
+
+### `discoverBranches`
+
+| Field | Required | Description |
+|---|---|---|
+| `discoverBranches` | No | When `true`, the app calls the GitHub `listBranches` API for `DOCS_REPO` and merges every branch into the branch list at load time. Defaults to `false`. |
+
+Discovered branches inherit `userGroups` / `comments` / `chat` from the **first** explicit `branches:` entry (used as a template), so you still need at least one hand-declared branch. Explicit entries keep their own settings — discovery only adds branches that aren't already declared.
+
+Fails soft: if the API call errors, the app logs a warning and falls back to the declared branches only.
+
+Best paired with the top-nav switcher's search box for repos with dozens of branches.
 
 ### `include`
 
@@ -227,5 +250,5 @@ The `indexing` section follows the same glob syntax — see [`indexing`](#indexi
 - The file must be named exactly `projectpages.config` (no extension) and live at the repository root.
 - `site.title`, at least one `include` pattern, at least one `userGroups` entry, and at least one `branches` entry are required.
 - The file is parsed as YAML — check indentation and quoting if you see parse errors in Vercel logs.
-- Passphrases are compared exactly (case-sensitive, whitespace-sensitive).
+- Passphrases are compared exactly (case-sensitive, whitespace-sensitive). If a `PROJECTPAGES_PASSPHRASE_<GROUP>` env var is set, the config's `passphrase:` is ignored for that group — set the env var to the empty string to fall back to the config value.
 - The repository being read is determined entirely by the `DOCS_REPO` env var in the app — there is no `source.repo` field in this config.
