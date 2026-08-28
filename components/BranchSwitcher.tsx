@@ -2,7 +2,30 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+
+function highlightMatch(text: string, query: string): React.ReactNode {
+  const q = query.trim();
+  if (!q) return text;
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark
+        style={{
+          background: "var(--color-accent-tint)",
+          color: "var(--color-ink-90)",
+          padding: "0 1px",
+          borderRadius: "2px",
+        }}
+      >
+        {text.slice(idx, idx + q.length)}
+      </mark>
+      {text.slice(idx + q.length)}
+    </>
+  );
+}
 
 export default function BranchSwitcher() {
   const { data: session, update } = useSession();
@@ -10,7 +33,9 @@ export default function BranchSwitcher() {
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -23,11 +48,28 @@ export default function BranchSwitcher() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  if (!session || !session.accessibleBranches?.length) return null;
+  // When the dropdown opens, focus the search box and clear the query
+  useEffect(() => {
+    if (open) {
+      setQuery("");
+      queueMicrotask(() => searchRef.current?.focus());
+    }
+  }, [open]);
 
-  // Only show the switcher if the user has more than one branch available
-  const branches = session.accessibleBranches;
-  const current = session.branchName;
+  const branches = session?.accessibleBranches ?? [];
+  const current = session?.branchName ?? "";
+
+  const filteredBranches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return branches;
+    const matches = branches.filter((b) => b.toLowerCase().includes(q));
+    if (!matches.includes(current) && branches.includes(current)) {
+      return [current, ...matches];
+    }
+    return matches;
+  }, [branches, current, query]);
+
+  if (!session || !session.accessibleBranches?.length) return null;
 
   async function switchBranch(branch: string) {
     if (branch === current || switching) return;
@@ -201,16 +243,104 @@ export default function BranchSwitcher() {
             position: "absolute",
             top: "calc(100% + 6px)",
             right: 0,
-            minWidth: "180px",
+            minWidth: "280px",
+            maxWidth: "360px",
             background: "var(--color-card)",
             border: "1px solid var(--color-rule)",
             borderRadius: "2px",
             boxShadow: "0 20px 40px rgba(15, 14, 11, 0.12)",
             overflow: "hidden",
             zIndex: 200,
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "min(70vh, 520px)",
           }}
         >
-          {branches.map((branch) => (
+          {/* Search input */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.55rem",
+              padding: "0.65rem 0.9rem",
+              borderBottom: "1px solid var(--color-rule)",
+              background: "var(--color-paper)",
+              flexShrink: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: "var(--color-ink-40)", flexShrink: 0 }}>
+              <circle cx="5" cy="5" r="3.5" />
+              <path d="M8 8l3 3" strokeLinecap="round" />
+            </svg>
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  if (query) {
+                    e.stopPropagation();
+                    setQuery("");
+                  } else {
+                    setOpen(false);
+                  }
+                }
+                if (e.key === "Enter" && filteredBranches.length > 0) {
+                  e.preventDefault();
+                  const first = filteredBranches.find((b) => b !== current) ?? filteredBranches[0];
+                  switchBranch(first);
+                }
+              }}
+              placeholder={`Search ${branches.length} branches…`}
+              aria-label="Filter branches"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontFamily: "var(--font-sans)",
+                fontSize: "0.8125rem",
+                color: "var(--color-ink-90)",
+              }}
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => { setQuery(""); searchRef.current?.focus(); }}
+                aria-label="Clear filter"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "0.15rem 0.3rem",
+                  cursor: "pointer",
+                  color: "var(--color-ink-40)",
+                  fontSize: "0.9rem",
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Result list */}
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {filteredBranches.length === 0 && (
+              <div
+                style={{
+                  padding: "1rem 0.9rem",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: "0.8125rem",
+                  color: "var(--color-ink-40)",
+                  textAlign: "center",
+                }}
+              >
+                No branches match &ldquo;{query}&rdquo;
+              </div>
+            )}
+            {filteredBranches.map((branch) => (
             <button
               key={branch}
               role="option"
@@ -243,9 +373,12 @@ export default function BranchSwitcher() {
                 </svg>
               )}
               {branch !== current && <span style={{ width: 10, flexShrink: 0 }} />}
-              {branch}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {highlightMatch(branch, query)}
+              </span>
             </button>
           ))}
+          </div>
         </div>
       )}
     </div>
