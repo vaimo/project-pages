@@ -51,6 +51,13 @@ export interface VaimoConfig {
   };
   userGroups: UserGroupConfig[];
   branches: VaimoBranchConfig[];
+  /**
+   * When true, the docs repo's branches are auto-listed at load time
+   * (via the GitHub API). Any explicit `branches:` entries stay in place
+   * and act as templates for permissions/comments/chat; discovered
+   * branches inherit those settings from the first explicit entry.
+   */
+  discoverBranches?: boolean;
   features?: {
     images?: boolean;
   };
@@ -93,6 +100,7 @@ export interface ParsedConfig {
   auth: { sessionDurationDays: number };
   userGroups: ParsedUserGroup[];
   branches: ParsedBranch[];
+  discoverBranches: boolean;
   features: { images: boolean };
   chat: ParsedChat;
   include: string[];
@@ -185,6 +193,7 @@ export function parseConfig(raw: string): ParsedConfig {
         },
       },
     },
+    discoverBranches: parsed.discoverBranches === true,
     include: parsed.include,
     exclude: parsed.exclude ?? [],
   };

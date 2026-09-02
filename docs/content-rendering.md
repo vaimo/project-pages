@@ -25,6 +25,8 @@ Each file page shows:
 - External links open in a new tab.
 - Images referenced in Markdown are proxied through `/api/raw?path=...` so they respect the GitHub token for private repos.
 - Comment references are injected at render time when comments exist (see [Comments](./comments.md)).
+- **YAML frontmatter** at the top of a Markdown file is parsed out of the body and rendered above the article as an editorial "At a glance" block — serif title, italic description, metadata grid (with tag chips and formatted dates), and full-width sections for long arrays like `related` or `applies_to`. A leading `# Title` in the body that matches `title:` in the frontmatter is stripped so the title isn't rendered twice.
+- **Mermaid diagrams** (` ```mermaid ` code blocks) render inline with two controls: **Source** flips to the raw code, **Zoom** opens a fullscreen overlay with wheel-zoom, drag-pan, and Escape-to-close. Actors in sequence diagrams and nodes in flowcharts are auto-coloured with a per-participant palette so multi-actor diagrams read at a glance.
 
 ## Navigation
 
@@ -44,9 +46,11 @@ Each file page shows:
 ### Sidebar
 
 - Built from the filtered file tree (config `include`/`exclude` rules applied to the authenticated branch).
-- Folder names are collapsible groups.
-- Files are listed as links within their group.
-- The active file is highlighted.
+- Folder names are collapsible groups; the folder(s) containing the currently-viewed file auto-expand on load.
+- Files and folders are pretty-named: `.md` extensions are stripped and `_`/`-`/`.` become spaces (`returns_lifecycle.md` → "Returns Lifecycle"). Words already containing uppercase are preserved so acronyms like `SAP` and `ECOM_FRONTEND` survive.
+- The active file gets a full ochre-tint band, thicker accent border, and a checkmark; the sidebar auto-scrolls it into view.
+- Folder rows are visually heavier than file rows so the hierarchy is easy to scan.
+- The sidebar is drag-resizable via the right-hand grip.
 - On mobile, the sidebar collapses to a hamburger menu.
 
 ### Home / Index Page

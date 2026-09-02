@@ -1,22 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  /* Vaimo brand colour tokens */
-  --color-grey-900: #1a1a1a;
-  --color-grey-700: #404040;
-  --color-grey-500: #808080;
-  --color-grey-300: #c8c8c8;
-  --color-grey-100: #f2f2f2;
-  --color-yellow:   #f5c400;
-  --color-white:    #ffffff;
+  /* ── Palette — editorial, byredo × vaimo ─────────────────────────────────
+     Warm cream paper, near-black ink, a hairline stone rule, and a single
+     ochre-yellow accent used sparingly. Legacy grey-* / yellow tokens are
+     preserved (some components reference them directly).                    */
+  --color-paper:      #f7f4ec;   /* warm off-white, page bg */
+  --color-paper-alt:  #efeadb;   /* deeper cream */
+  --color-card:       #fdfbf6;   /* card / prose ground */
+  --color-ink-90:     #0f0e0b;   /* near black */
+  --color-ink-70:     #3a362e;   /* body copy */
+  --color-ink-40:     #857e6d;   /* muted */
+  --color-rule:       #d6cfba;   /* hairline stone */
+  --color-rule-soft:  #e7e1cf;
+  --color-accent:     #f4b301;   /* ochre yellow, brand */
+  --color-accent-ink: #7a5300;   /* legible on cream */
+  --color-accent-tint:#fff1c2;
+  --color-ink-invert: #fbf7ec;
 
-  /* Chat — user-prompt bubble: subtly darker than --color-grey-100 page background */
-  --color-chat-user-bg: #e5e5e5;
+  /* ── Legacy compatibility tokens ─────────────────────────────────────── */
+  --color-grey-900: var(--color-ink-90);
+  --color-grey-700: var(--color-ink-70);
+  --color-grey-500: var(--color-ink-40);
+  --color-grey-300: var(--color-rule);
+  --color-grey-100: var(--color-paper-alt);
+  --color-yellow:   var(--color-accent);
+  --color-white:    var(--color-card);
+  --color-chat-user-bg: var(--color-paper-alt);
 
   /* Layout */
   --sidebar-width: 260px;
-  --content-max-width: 800px;
-  --nav-height: 56px;
+  --content-max-width: 780px;
+  --nav-height: 64px;
+
+  /* Type stacks — next/font sets the variables in <html> */
+  --font-serif:  "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans:   "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:   "JetBrains Mono", ui-monospace, "Cascadia Code", "Fira Mono", monospace;
 }
 
 *,
@@ -33,18 +53,31 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.6;
-  color: var(--color-grey-900);
-  background: var(--color-grey-100);
+  color: var(--color-ink-90);
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Faint paper grain — 1px noise overlay, sits behind everything */
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(122, 83, 0, 0.03), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(15, 14, 11, 0.025), transparent 45%);
 }
+
+/* Selection */
+::selection { background: var(--color-accent); color: var(--color-ink-90); }
 
 /* ── Prose (rendered markdown) ───────────────────────────────────────────── */
 .prose {
-  max-width: var(--content-max-width);
-  color: var(--color-grey-900);
+  max-width: none;
+  color: var(--color-ink-70);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.75;
+  font-feature-settings: "kern", "liga", "onum";
 }
 
 .prose h1,
@@ -53,98 +86,202 @@ body {
 .prose h4,
 .prose h5,
 .prose h6 {
-  font-weight: 600;
-  color: var(--color-grey-900);
-  margin-top: 2rem;
-  margin-bottom: 0.75rem;
-  line-height: 1.3;
+  font-family: var(--font-serif);
+  color: var(--color-ink-90);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin-top: 2.5rem;
+  margin-bottom: 0.9rem;
   scroll-margin-top: calc(var(--nav-height) + 1.5rem);
+  font-variation-settings: "opsz" 72, "SOFT" 20;
 }
 
-.prose h1 { font-size: 1.875rem; }
-.prose h2 { font-size: 1.5rem;   border-bottom: 1px solid var(--color-grey-300); padding-bottom: 0.4rem; }
-.prose h3 { font-size: 1.25rem;  }
+.prose h1 {
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
+  margin-top: 0;
+  letter-spacing: -0.022em;
+  font-variation-settings: "opsz" 144, "SOFT" 30;
+}
+.prose h2 {
+  font-size: 1.75rem;
+  border-bottom: 1px solid var(--color-rule);
+  padding-bottom: 0.5rem;
+  font-variation-settings: "opsz" 72, "SOFT" 25;
+}
+.prose h3 {
+  font-size: 1.35rem;
+  font-variation-settings: "opsz" 36, "SOFT" 15;
+}
+.prose h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  color: var(--color-ink-90);
+  text-transform: none;
+}
 
 .prose p {
-  margin-bottom: 1rem;
+  margin: 0 0 1.15rem;
 }
 
+.prose strong { color: var(--color-ink-90); font-weight: 600; }
+.prose em     { font-family: var(--font-serif); font-style: italic; font-weight: 400; font-variation-settings: "opsz" 20; }
+
 .prose a {
-  color: var(--color-grey-900);
+  color: var(--color-ink-90);
   text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+  text-decoration-color: var(--color-rule);
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
 }
 
 .prose a:hover {
-  color: var(--color-grey-700);
+  color: var(--color-accent-ink);
+  text-decoration-color: var(--color-accent);
 }
 
 .prose code {
-  font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
-  font-size: 0.875em;
-  background: var(--color-grey-100);
-  border: 1px solid var(--color-grey-300);
-  border-radius: 3px;
-  padding: 0.1em 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-paper-alt);
+  border: 1px solid var(--color-rule);
+  border-radius: 2px;
+  padding: 0.1em 0.4em;
+  color: var(--color-ink-90);
 }
 
 .prose pre {
-  background: var(--color-grey-100);
-  border: 1px solid var(--color-grey-300);
-  border-radius: 6px;
-  padding: 1rem;
+  background: var(--color-ink-90);
+  color: var(--color-ink-invert);
+  border: none;
+  border-radius: 2px;
+  padding: 1.25rem 1.5rem;
   overflow-x: auto;
-  margin-bottom: 1.25rem;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.15);
 }
 
 .prose pre code {
   background: none;
   border: none;
   padding: 0;
-  font-size: 0.875rem;
+  color: inherit;
+  font-size: inherit;
 }
+
+/* Rehype-highlight colors, remapped for the dark code block */
+.prose pre .hljs-keyword,
+.prose pre .hljs-selector-tag,
+.prose pre .hljs-tag           { color: #ffcc70; }
+.prose pre .hljs-string,
+.prose pre .hljs-attr          { color: #c4d8a4; }
+.prose pre .hljs-number,
+.prose pre .hljs-literal       { color: #f7a1a1; }
+.prose pre .hljs-comment       { color: #7a7060; font-style: italic; }
+.prose pre .hljs-title,
+.prose pre .hljs-name          { color: #b0d0ff; }
 
 .prose blockquote {
-  border-left: 3px solid var(--color-yellow);
-  margin-left: 0;
-  padding-left: 1rem;
-  color: var(--color-grey-700);
+  border-left: 2px solid var(--color-accent);
+  margin: 1.5rem 0;
+  padding: 0.5rem 0 0.5rem 1.25rem;
+  color: var(--color-ink-70);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-variation-settings: "opsz" 24;
+  font-size: 1.05rem;
+  line-height: 1.5;
 }
 
+/* ── Lists — restore native markers Tailwind resets away ─────────────────── */
 .prose ul,
 .prose ol {
   padding-left: 1.5rem;
-  margin-bottom: 1rem;
+  margin: 0 0 1.15rem;
 }
 
-.prose li {
-  margin-bottom: 0.25rem;
+/* Tailwind v4 preflight sets `list-style: none` on ul/ol inside @layer base.
+   Layer-cascade priority *should* let unlayered rules win, but Turbopack's
+   compiled output here has the base rule beating ours in practice — force it. */
+.prose ul { list-style-position: outside !important; list-style-type: disc !important; }
+.prose ol { list-style-position: outside !important; list-style-type: decimal !important; }
+
+.prose ul ul { list-style-type: circle !important; }
+.prose ul ul ul { list-style-type: square !important; }
+.prose ol ol { list-style-type: lower-alpha !important; }
+.prose ol ol ol { list-style-type: lower-roman !important; }
+
+.prose li { margin: 0.25rem 0; }
+
+.prose li::marker {
+  color: var(--color-accent-ink);
+  font-weight: 600;
 }
 
+.prose ul.contains-task-list,
+.prose ul.contains-task-list ul {
+  list-style: none;
+  padding-left: 1.25rem;
+}
+
+.prose li > input[type="checkbox"] {
+  margin-right: 0.5rem;
+  transform: translateY(1px);
+  accent-color: var(--color-accent);
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--color-rule);
+  margin: 2.5rem 0;
+}
+
+/* Tables — editorial ruled */
 .prose table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9375rem;
-  margin-bottom: 1.25rem;
+  margin: 1.5rem 0;
+  border-top: 2px solid var(--color-ink-90);
+  border-bottom: 1px solid var(--color-ink-90);
 }
 
-.prose th {
+.prose thead th {
   text-align: left;
+  font-family: var(--font-sans);
   font-weight: 600;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 2px solid var(--color-grey-300);
-  background: var(--color-grey-100);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--color-ink-90);
+  background: transparent;
+  color: var(--color-ink-90);
 }
 
 .prose td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--color-grey-300);
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--color-rule);
+  vertical-align: top;
 }
+
+.prose tbody tr:last-child td { border-bottom: none; }
 
 .prose img {
   max-width: 100%;
-  border-radius: 4px;
+  border-radius: 2px;
+  border: 1px solid var(--color-rule);
 }
+
+/* Mermaid inner SVGs — keep them readable inside frame */
+.mermaid-frame svg { max-width: 100%; height: auto; }
+.mermaid-zoom-svg { width: min(88vw, 1400px); }
+.mermaid-zoom-svg svg { width: 100%; height: auto; max-height: 78vh; }
 
 /* ── Comment reference superscripts injected into prose ──────────────────── */
 .prose .comment-ref {
@@ -153,8 +290,8 @@ body {
   justify-content: center;
   width: 1.1em;
   height: 1.1em;
-  background: var(--color-yellow);
-  color: var(--color-grey-900);
+  background: var(--color-accent);
+  color: var(--color-ink-90);
   font-size: 0.65em;
   font-weight: 700;
   border-radius: 50%;
@@ -166,15 +303,42 @@ body {
 
 /* ── Outline panel ───────────────────────────────────────────────────────── */
 .outline-link:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--color-paper-alt);
 }
 
-/* ── Scrollbar (subtle) ──────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--color-grey-100); }
-::-webkit-scrollbar-thumb { background: var(--color-grey-300); border-radius: 3px; }
+/* ── Sidebar helpers ─────────────────────────────────────────────────────── */
+.sidebar-link:hover { background: var(--color-paper-alt); }
+
+/* ── Scrollbar (subtle, editorial) ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-rule);
+  border-radius: 999px;
+  border: 2px solid var(--color-paper);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-40); }
 
 /* ── Loading spinner ─────────────────────────────────────────────────────── */
-@keyframes vaimo-spin {
-  to { transform: rotate(360deg); }
+@keyframes vaimo-spin { to { transform: rotate(360deg); } }
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up { animation: fade-up 0.35s ease-out both; }
+
+/* ── Byline / breadcrumb helpers ─────────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-ink-40);
+}
+
+.rule-topline {
+  border-top: 1px solid var(--color-ink-90);
+  padding-top: 0.5rem;
 }

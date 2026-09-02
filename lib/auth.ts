@@ -6,6 +6,27 @@ import { getConfig } from "./github";
 
 const ENABLE_GOOGLE = process.env.ENABLE_GOOGLE_LOGIN === "true" || process.env.ENABLE_GOOGLE_LOGIN === "1";
 
+/**
+ * Resolves a user group's passphrase, preferring an environment variable
+ * over whatever's in projectpages.config. This lets teams keep the config
+ * file (which lives in the docs repository) secret-free and set the real
+ * passphrase per environment.
+ *
+ * Env var name: PROJECTPAGES_PASSPHRASE_<GROUPNAME> — the group name is
+ * upper-cased and any non-alphanumeric character becomes an underscore.
+ * Examples:
+ *   userGroup "vaimo"            → PROJECTPAGES_PASSPHRASE_VAIMO
+ *   userGroup "external-partner" → PROJECTPAGES_PASSPHRASE_EXTERNAL_PARTNER
+ *
+ * Falls back to `configPassphrase` when the env var is unset — so an
+ * accidental miss doesn't silently lock everyone out of the docs.
+ */
+function resolveGroupPassphrase(groupName: string, configPassphrase: string): string {
+  const envKey = `PROJECTPAGES_PASSPHRASE_${groupName.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+  const fromEnv = process.env[envKey];
+  return typeof fromEnv === "string" && fromEnv.length > 0 ? fromEnv : configPassphrase;
+}
+
 export async function buildAuthOptions(): Promise<NextAuthOptions> {
   let sessionMaxAge = 7 * 24 * 60 * 60; // default: 7 days in seconds
 
@@ -96,7 +117,8 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
           passphrase: { label: "Passphrase", type: "password" },
         },
         async authorize(credentials) {
-          if (!credentials?.passphrase) return null;
+          const bypass = process.env.DEV_AUTH_BYPASS === "1";
+          if (!bypass && !credentials?.passphrase) return null;
 
           let config;
           try {
@@ -105,9 +127,11 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
             throw new Error("Unable to load configuration");
           }
 
-          const userGroup = config.userGroups.find(
-            (g) => g.passphrase === credentials.passphrase
-          );
+          const userGroup = bypass
+            ? config.userGroups[0]
+            : config.userGroups.find(
+                (g) => resolveGroupPassphrase(g.name, g.passphrase) === credentials!.passphrase,
+              );
           if (!userGroup) return null;
 
           const accessibleBranches = getAccessibleBranches(userGroup.name, config);

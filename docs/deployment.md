@@ -51,6 +51,9 @@ npm run dev
 | `CHAT_CHUNK_TOP_K` | No | Default LightRAG `chunk_top_k`. Defaults to `25`. |
 | `CHAT_LANGUAGE_INSTRUCTION` | No | Forwarded as `user_prompt` on every query. Defaults to "You MUST respond in English." (works around DeepSeek language drift). |
 | `CHAT_TIMEOUT_MS` | No | Abort the chat backend call after this many milliseconds. Defaults to `120000`. |
+| `PROJECTPAGES_PASSPHRASE_<GROUP>` | No | Per-user-group passphrase override. Group name is upper-cased, non-alphanumerics become underscores (e.g. `vaimo` → `PROJECTPAGES_PASSPHRASE_VAIMO`). Wins over the value in `projectpages.config`. Recommended so real secrets never live in the docs repo. |
+| `PROJECTPAGES_LOCAL_CONFIG` | No | Absolute path to a `projectpages.config`-shaped YAML file on the deployment's filesystem. When set, the app reads config from disk instead of the GitHub API. Intended for local dev — set only via `.env.local`, never on Vercel. |
+| `DEV_AUTH_BYPASS` | No | Set to `1` to skip the passphrase check entirely and log in as the first user group. **Development only — never set in production.** |
 
 ---
 

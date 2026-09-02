@@ -27,36 +27,50 @@ project-pages/
 │           └── github/route.ts        # GitHub push webhook handler
 │
 ├── components/
-│   ├── Sidebar.tsx
-│   ├── TopNav.tsx
+│   ├── Sidebar.tsx                # Nav tree: pretty-names, auto-expand, drag-resize
+│   ├── TopNav.tsx                 # Logo + site title + branch switcher + sign out
+│   ├── BranchSwitcher.tsx         # Searchable branch dropdown
 │   ├── FileView/
 │   │   ├── MarkdownView.tsx
+│   │   ├── Frontmatter.tsx        # YAML frontmatter "At a glance" block
+│   │   ├── MermaidBlock.tsx       # Inline diagram + fullscreen zoom overlay
+│   │   ├── OutlinePanel.tsx       # Hover-to-expand headings panel
 │   │   ├── CsvView.tsx
-│   │   └── ImageView.tsx
+│   │   ├── ImageView.tsx
+│   │   ├── ExcalidrawView.tsx
+│   │   └── SubtitleView.tsx
 │   ├── Comments/
 │   │   ├── CommentPanel.tsx
 │   │   ├── CommentThread.tsx
 │   │   └── CommentForm.tsx
-│   └── DownloadButton.tsx
+│   ├── DownloadButton.tsx
+│   ├── ExcalidrawPngButton.tsx
+│   ├── ConfigError.tsx
+│   ├── SectionTabs.tsx
+│   └── ClientLayout.tsx
 │
 ├── lib/
-│   ├── github.ts          # GitHub API client, config loader, file fetching
+│   ├── github.ts          # GitHub API client, config loader (with local override + branch discovery)
 │   ├── supabase.ts        # Supabase client, comment CRUD
-│   ├── config.ts          # projectpages.config parser + glob filter
-│   ├── auth.ts            # NextAuth options (branch-based passphrase auth)
+│   ├── config.ts          # projectpages.config parser + glob filter + discoverBranches flag
+│   ├── auth.ts            # NextAuth options (per-user-group passphrase, env override, DEV_AUTH_BYPASS)
 │   ├── nav.ts             # File tree → sidebar nav builder
-│   ├── markdown.ts        # Markdown rendering + comment annotation
+│   ├── markdown.ts        # Markdown + frontmatter (gray-matter) + comment annotation
+│   ├── chat.ts            # LightRAG chat backend adapter
 │   └── docx.ts            # DOCX preview support
 │
 ├── types/
-│   └── next-auth.d.ts     # Session type extension (branchName)
+│   └── next-auth.d.ts     # Session type extension (branchName, userGroupName, accessibleBranches)
 │
-├── styles/
-│   └── globals.css        # CSS custom properties (brand tokens)
+├── app/globals.css        # Palette tokens, prose styles, editorial fonts wired via next/font
 │
 ├── public/
-│   ├── vaimo-logo.webp
-│   └── vaimo-logo-white.svg
+│   ├── vaimo-logo-dark.png      # Dark wordmark + ochre X — top nav
+│   ├── vaimo-logo-white.svg     # White logo — sign-in cover
+│   ├── vaimo-logo.svg           # Legacy (white fill, keep for reference)
+│   ├── vaimo-logo.webp          # Legacy raster
+│   ├── vaimo-logo-white.png     # Legacy raster
+│   └── google-mark.svg          # Google sign-in button
 │
 ├── supabase/
 │   └── migrations/
@@ -75,8 +89,12 @@ project-pages/
 
 | File | Purpose |
 |---|---|
-| `lib/config.ts` | Parses `projectpages.config` YAML; defines `ParsedConfig`, `ParsedBranch` types |
-| `lib/github.ts` | All GitHub API calls; accepts `branch` param for per-branch content fetching |
-| `lib/auth.ts` | NextAuth options; matches passphrase → branch; stores `branchName` in JWT |
+| `lib/config.ts` | Parses `projectpages.config` YAML; defines `ParsedConfig`, `ParsedBranch` types; carries `discoverBranches` flag |
+| `lib/github.ts` | All GitHub API calls; per-branch content fetching; local-config override via `PROJECTPAGES_LOCAL_CONFIG`; auto-branch discovery when `discoverBranches: true` |
+| `lib/auth.ts` | NextAuth options; per-user-group passphrase matching with `PROJECTPAGES_PASSPHRASE_<GROUP>` env override; optional `DEV_AUTH_BYPASS`; stores `userGroupName` + `branchName` + `accessibleBranches` in the JWT |
+| `lib/markdown.ts` | Markdown pipeline (remark → rehype → highlight). Parses YAML frontmatter via `gray-matter` and returns it separately from the rendered HTML |
 | `lib/supabase.ts` | Comment CRUD; all queries are scoped by `(file_path, branch)` |
-| `types/next-auth.d.ts` | Extends `Session` with `branchName: string` |
+| `components/FileView/Frontmatter.tsx` | Renders parsed frontmatter as the "At a glance" block |
+| `components/FileView/MermaidBlock.tsx` | Mermaid rendering + fullscreen zoom overlay + per-participant colouring |
+| `components/BranchSwitcher.tsx` | Searchable dropdown of accessible branches |
+| `types/next-auth.d.ts` | Extends `Session` with `branchName`, `userGroupName`, `accessibleBranches` |

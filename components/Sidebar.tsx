@@ -13,6 +13,21 @@ function hasImageChildren(node: NavFolder): boolean {
   );
 }
 
+/**
+ * Turns a raw path segment ("returns_lifecycle.md" / "product-catalog" /
+ * "ECOM_FRONTEND") into a human-readable label. Strips a trailing `.md`,
+ * splits on `_`/`-`/`.`, then capitalises words that are entirely lowercase
+ * so acronyms like `SAP`, `ECOM`, `FRONTEND` survive intact.
+ */
+function prettyName(raw: string): string {
+  const noExt = raw.replace(/\.(md|mdx)$/i, "");
+  return noExt
+    .split(/[_\-.]+/)
+    .filter(Boolean)
+    .map((w) => (/[A-Z]/.test(w) ? w : w[0].toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
 const SIDEBAR_DEFAULT_WIDTH = 338;
 const SIDEBAR_MIN_WIDTH = 140;
 const SIDEBAR_MAX_WIDTH = 800;
@@ -23,15 +38,32 @@ interface SidebarProps {
   activePath?: string;
 }
 
-function FolderNode({ node, depth, activePath }: { node: NavFolder; depth: number; activePath?: string }) {
-  const storageKey = `vaimo:folder:${node.path}`;
-  const [open, setOpen] = useState(false);
+function useActivePath(): string {
+  const pathname = usePathname();
+  if (!pathname?.startsWith("/view/")) return "";
+  return pathname
+    .slice("/view/".length)
+    .split("/")
+    .map((s) => {
+      try { return decodeURIComponent(s); } catch { return s; }
+    })
+    .join("/");
+}
 
-  // Restore persisted state on mount (client only — localStorage unavailable on server)
+function FolderNode({ node, depth }: { node: NavFolder; depth: number }) {
+  const storageKey = `vaimo:folder:${node.path}`;
+  const activePath = useActivePath();
+  const containsActive = activePath === node.path || activePath.startsWith(node.path + "/");
+
+  // Seed open state from localStorage if present, else from whether this
+  // folder contains the currently-viewed file. Recompute when active path changes.
+  const [open, setOpen] = useState<boolean>(containsActive);
+
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved !== null) setOpen(saved === "true");
-  }, [storageKey]);
+    const saved = typeof window !== "undefined" ? localStorage.getItem(storageKey) : null;
+    if (saved !== null) setOpen(saved === "true" || containsActive);
+    else setOpen(containsActive);
+  }, [storageKey, containsActive]);
 
   const toggle = useCallback(() => {
     setOpen((v) => {
@@ -59,13 +91,15 @@ function FolderNode({ node, depth, activePath }: { node: NavFolder; depth: numbe
             background: "none",
             border: "none",
             cursor: "pointer",
-            padding: `0.3rem ${0.75 + depth * 0.75}rem`,
-            fontSize: "0.7rem",
-            fontWeight: 600,
-            color: "var(--color-grey-700)",
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
+            padding: `0.42rem ${1.25 + depth * 0.85}rem`,
+            fontSize: depth === 0 ? "0.6875rem" : "0.8125rem",
+            fontFamily: "var(--font-sans)",
+            fontWeight: depth === 0 ? 700 : 600,
+            color: containsActive ? "var(--color-ink-90)" : "var(--color-ink-90)",
+            textTransform: depth === 0 ? "uppercase" : "none",
+            letterSpacing: depth === 0 ? "0.18em" : "0.005em",
             overflow: "hidden",
+            transition: "color 0.15s, background 0.15s",
           }}
         >
           <svg
@@ -77,12 +111,13 @@ function FolderNode({ node, depth, activePath }: { node: NavFolder; depth: numbe
               transform: open ? "rotate(90deg)" : "rotate(0deg)",
               transition: "transform 0.15s",
               flexShrink: 0,
+              opacity: 0.6,
             }}
           >
             <polygon points="2,1 8,5 2,9" />
           </svg>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {node.name}
+            {prettyName(node.name)}
           </span>
         </button>
         {showGallery && (
@@ -95,9 +130,9 @@ function FolderNode({ node, depth, activePath }: { node: NavFolder; depth: numbe
               padding: "0.15rem 0.35rem",
               fontSize: "0.6rem",
               fontWeight: 600,
-              color: "var(--color-grey-500)",
-              border: "1px solid var(--color-grey-300)",
-              borderRadius: "3px",
+              color: "var(--color-ink-40)",
+              border: "1px solid var(--color-rule)",
+              borderRadius: "2px",
               textDecoration: "none",
               letterSpacing: "0.02em",
               whiteSpace: "nowrap",
@@ -110,7 +145,7 @@ function FolderNode({ node, depth, activePath }: { node: NavFolder; depth: numbe
       {open && (
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {node.children.map((child) => (
-            <NavItem key={child.path} node={child} depth={depth + 1} activePath={activePath} />
+            <NavItem key={child.path} node={child} depth={depth + 1} />
           ))}
         </ul>
       )}
@@ -118,41 +153,56 @@ function FolderNode({ node, depth, activePath }: { node: NavFolder; depth: numbe
   );
 }
 
-function FileNode({ node, depth, activePath }: { node: NavNode & { type: "file" }; depth: number; activePath?: string }) {
-  const pathname = usePathname();
+function FileNode({ node, depth }: { node: NavNode & { type: "file" }; depth: number }) {
+  const activePath = useActivePath();
   const href = `/view/${node.path.split("/").map(encodeURIComponent).join("/")}`;
-  const isActive = pathname === href || node.path === activePath;
+  const isActive = node.path === activePath;
 
   return (
     <li>
       <Link
         href={href}
         style={{
-          display: "block",
-          padding: `0.3rem ${0.75 + depth * 0.75}rem`,
-          fontSize: "0.7rem",
-          color: isActive ? "var(--color-grey-900)" : "var(--color-grey-700)",
-          fontWeight: isActive ? 600 : 400,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.55rem",
+          padding: `0.38rem ${1.25 + depth * 0.85}rem`,
+          fontSize: "0.8125rem",
+          fontFamily: "var(--font-sans)",
+          color: isActive ? "var(--color-ink-90)" : "var(--color-ink-70)",
+          fontWeight: isActive ? 700 : 400,
           textDecoration: "none",
-          borderLeft: isActive ? "3px solid var(--color-yellow)" : "3px solid transparent",
-          background: isActive ? "var(--color-yellow)" : "transparent",
+          borderLeft: isActive ? "3px solid var(--color-accent)" : "3px solid transparent",
+          background: isActive ? "var(--color-accent-tint)" : "transparent",
+          boxShadow: isActive ? "inset 0 -1px 0 var(--color-accent), inset 0 1px 0 var(--color-accent)" : "none",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
+          transition: "background 0.15s, color 0.15s",
         }}
       >
-        {node.name}
+        {isActive ? (
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden style={{ flexShrink: 0, color: "var(--color-accent-ink)" }}>
+            <path d="M2.5 5.2l1.6 1.6L8 2.7" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <span
+            aria-hidden
+            style={{ width: "10px", flexShrink: 0, height: "1px", background: "var(--color-rule)" }}
+          />
+        )}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{prettyName(node.name)}</span>
       </Link>
     </li>
   );
 }
 
-function NavItem({ node, depth, activePath }: { node: NavNode; depth: number; activePath?: string }) {
-  if (node.type === "folder") return <FolderNode node={node} depth={depth} activePath={activePath} />;
-  return <FileNode node={node} depth={depth} activePath={activePath} />;
+function NavItem({ node, depth }: { node: NavNode; depth: number }) {
+  if (node.type === "folder") return <FolderNode node={node} depth={depth} />;
+  return <FileNode node={node} depth={depth} />;
 }
 
-export default function Sidebar({ tree, isOpen, activePath }: SidebarProps) {
+export default function Sidebar({ tree }: SidebarProps) {
   const [width, setWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const dragging = useRef(false);
   const startX = useRef(0);
@@ -180,6 +230,15 @@ export default function Sidebar({ tree, isOpen, activePath }: SidebarProps) {
     window.addEventListener("mouseup", onMouseUp);
   }, [width]);
 
+  // Auto-scroll the active file into view on load
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const active = document.querySelector('aside[aria-label="Navigation"] a[style*="rgba(15, 14, 11"], aside[aria-label="Navigation"] a[style*="accent-tint"]');
+      active?.scrollIntoView({ block: "center", behavior: "auto" });
+    }, 50);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <aside
       style={{
@@ -187,8 +246,8 @@ export default function Sidebar({ tree, isOpen, activePath }: SidebarProps) {
         minWidth: width,
         maxWidth: width,
         minHeight: "calc(100vh - var(--nav-height))",
-        background: "var(--color-white)",
-        borderRight: "1px solid var(--color-grey-300)",
+        background: "var(--color-paper)",
+        borderRight: "1px solid var(--color-rule)",
         overflowY: "auto",
         overflowX: "hidden",
         flexShrink: 0,
@@ -199,10 +258,25 @@ export default function Sidebar({ tree, isOpen, activePath }: SidebarProps) {
       }}
       aria-label="Navigation"
     >
-      <nav style={{ paddingTop: "1rem", paddingBottom: "2rem" }}>
+      <nav style={{ paddingTop: "0.75rem", paddingBottom: "2rem" }}>
+        <div
+          style={{
+            padding: "0.85rem 1.25rem 0.6rem",
+            borderBottom: "1px solid var(--color-rule)",
+            marginBottom: "0.5rem",
+            fontFamily: "var(--font-sans)",
+            fontSize: "0.6rem",
+            fontWeight: 600,
+            letterSpacing: "0.28em",
+            textTransform: "uppercase",
+            color: "var(--color-ink-40)",
+          }}
+        >
+          Contents
+        </div>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {tree.map((node) => (
-            <NavItem key={node.path} node={node} depth={0} activePath={activePath} />
+            <NavItem key={node.path} node={node} depth={0} />
           ))}
         </ul>
       </nav>
@@ -227,7 +301,7 @@ export default function Sidebar({ tree, isOpen, activePath }: SidebarProps) {
           width="6"
           height="24"
           viewBox="0 0 6 24"
-          fill="var(--color-grey-300)"
+          fill="var(--color-rule)"
           style={{ pointerEvents: "none", flexShrink: 0 }}
         >
           <circle cx="1.5" cy="4"  r="1.5" />
