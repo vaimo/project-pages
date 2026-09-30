@@ -73,14 +73,19 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
             const cfg = await getConfig();
             const groupName = cfg.userGroups[0]?.name;
             const accessibleBranches = groupName ? getAccessibleBranches(groupName, cfg) : [];
-            if (accessibleBranches.length > 0) {
-              const preferred = process.env.GOOGLE_DEFAULT_BRANCH;
-              (user as any).branchName =
-                preferred && accessibleBranches.includes(preferred) ? preferred : accessibleBranches[0];
-              (user as any).accessibleBranches = accessibleBranches;
+            if (accessibleBranches.length === 0) {
+              console.warn("No accessible branches configured for Google users (group:", groupName, ")");
+              return false;
             }
+
+            const preferred = process.env.GOOGLE_DEFAULT_BRANCH;
+            (user as any).userGroupName = groupName;
+            (user as any).branchName =
+              preferred && accessibleBranches.includes(preferred) ? preferred : accessibleBranches[0];
+            (user as any).accessibleBranches = accessibleBranches;
           } catch (err) {
             console.warn("Unable to read project config to determine accessible branches for Google users:", err);
+            return false;
           }
         }
         return true;
