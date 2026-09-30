@@ -66,17 +66,26 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
           // Attach google id to the user object so jwt callback can persist it.
           (user as any).google_id = account.providerAccountId;
 
-          // Map Google users to a branch. Use GOOGLE_DEFAULT_BRANCH if set, otherwise
-          // fall back to the first branch from projectpages.config.
+          // Google sign-in has no user-group concept of its own, so grant access
+          // to every configured branch (declared + discovered) rather than
+          // scoping to a single group. This mirrors what passphrase auth
+          // resolves to whenever every branch maps to the same group(s).
           try {
             const cfg = await getConfig();
-            const defaultBranch = process.env.GOOGLE_DEFAULT_BRANCH ?? cfg.branches[0]?.name;
-            if (defaultBranch) {
-              (user as any).branchName = defaultBranch;
-              (user as any).accessibleBranches = [defaultBranch];
+            const accessibleBranches = cfg.branches.map((b) => b.name);
+            if (accessibleBranches.length === 0) {
+              console.warn("No branches configured; rejecting Google sign-in");
+              return false;
             }
+
+            const preferred = process.env.GOOGLE_DEFAULT_BRANCH;
+            (user as any).userGroupName = cfg.userGroups[0]?.name ?? "";
+            (user as any).branchName =
+              preferred && accessibleBranches.includes(preferred) ? preferred : accessibleBranches[0];
+            (user as any).accessibleBranches = accessibleBranches;
           } catch (err) {
-            console.warn("Unable to read project config to determine default branch for Google users:", err);
+            console.warn("Unable to read project config to determine accessible branches for Google users:", err);
+            return false;
           }
         }
         return true;
