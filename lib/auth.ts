@@ -66,20 +66,20 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
           // Attach google id to the user object so jwt callback can persist it.
           (user as any).google_id = account.providerAccountId;
 
-          // Map Google users to the same branches as the first configured user
-          // group (mirrors how passphrase auth resolves accessible branches),
-          // so the branch switcher has more than one branch to offer.
+          // Google sign-in has no user-group concept of its own, so grant access
+          // to every configured branch (declared + discovered) rather than
+          // scoping to a single group. This mirrors what passphrase auth
+          // resolves to whenever every branch maps to the same group(s).
           try {
             const cfg = await getConfig();
-            const groupName = cfg.userGroups[0]?.name;
-            const accessibleBranches = groupName ? getAccessibleBranches(groupName, cfg) : [];
+            const accessibleBranches = cfg.branches.map((b) => b.name);
             if (accessibleBranches.length === 0) {
-              console.warn("No accessible branches configured for Google users (group:", groupName, ")");
+              console.warn("No branches configured; rejecting Google sign-in");
               return false;
             }
 
             const preferred = process.env.GOOGLE_DEFAULT_BRANCH;
-            (user as any).userGroupName = groupName;
+            (user as any).userGroupName = cfg.userGroups[0]?.name ?? "";
             (user as any).branchName =
               preferred && accessibleBranches.includes(preferred) ? preferred : accessibleBranches[0];
             (user as any).accessibleBranches = accessibleBranches;
