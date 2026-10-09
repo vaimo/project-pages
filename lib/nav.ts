@@ -1,5 +1,20 @@
 import type { TreeEntry } from "./github";
 
+/**
+ * Turns a raw path segment ("returns_lifecycle.md" / "product-catalog" /
+ * "ECOM_FRONTEND") into a human-readable label. Strips a trailing `.md`,
+ * splits on `_`/`-`/`.`, then capitalises words that are entirely lowercase
+ * so acronyms like `SAP`, `ECOM`, `FRONTEND` survive intact.
+ */
+export function prettyName(raw: string): string {
+  const noExt = raw.replace(/\.(md|mdx)$/i, "");
+  return noExt
+    .split(/[_\-.]+/)
+    .filter(Boolean)
+    .map((w) => (/[A-Z]/.test(w) ? w : w[0].toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
 export interface NavFile {
   type: "file";
   name: string;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { invalidateConfigCache } from "@/lib/github";
+import { invalidateSearchIndexCache } from "@/lib/search";
 
 function verifySignature(payload: string, signature: string, secret: string): boolean {
   const expected = `sha256=${crypto
@@ -33,8 +34,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Ignored" }, { status: 200 });
   }
 
-  // Bust local config cache so the next request reads fresh config
+  // Bust local caches so the next request reads fresh config/search data
   invalidateConfigCache();
+  invalidateSearchIndexCache();
 
   // Trigger Vercel redeploy — content may have changed on any branch
   const deployHook = process.env.VERCEL_DEPLOY_HOOK_URL;
