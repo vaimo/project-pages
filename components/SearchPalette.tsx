@@ -8,10 +8,9 @@ import { prettyName } from "@/lib/nav";
 interface SearchResult {
   path: string;
   title: string;
-  description: string;
   tags: string[];
-  excerpt: string;
   matchedTag: string | null;
+  snippet: string;
 }
 
 function highlightMatch(text: string, query: string): React.ReactNode {
@@ -37,11 +36,8 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
-function snippetFor(result: SearchResult): string {
-  if (result.description) return result.description;
-  if (result.excerpt) return result.excerpt.length > 160 ? result.excerpt.slice(0, 160) + "…" : result.excerpt;
-  return "";
-}
+const LISTBOX_ID = "search-palette-listbox";
+const optionId = (i: number) => `search-palette-option-${i}`;
 
 export default function SearchPalette() {
   const { data: session } = useSession();
@@ -50,6 +46,8 @@ export default function SearchPalette() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -59,6 +57,7 @@ export default function SearchPalette() {
     setOpen(false);
     setQuery("");
     setResults([]);
+    setError(false);
     setActiveIndex(0);
   }, []);
 
@@ -92,10 +91,12 @@ export default function SearchPalette() {
     const q = query.trim();
     if (!q) {
       setResults([]);
+      setError(false);
       setLoading(false);
       return;
     }
     setLoading(true);
+    setError(false);
     const id = ++requestId.current;
     const t = setTimeout(async () => {
       try {
@@ -108,13 +109,16 @@ export default function SearchPalette() {
         }
       } catch (err) {
         console.error("[projectpages] Search request failed:", err);
-        if (id === requestId.current) setResults([]);
+        if (id === requestId.current) {
+          setResults([]);
+          setError(true);
+        }
       } finally {
         if (id === requestId.current) setLoading(false);
       }
     }, 150);
     return () => clearTimeout(t);
-  }, [query, open]);
+  }, [query, open, retryTick]);
 
   const goTo = useCallback(
     (result: SearchResult) => {
@@ -130,10 +134,14 @@ export default function SearchPalette() {
       ?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
+  // Escape is handled at the dialog level (not just the input) so it still
+  // closes the palette after focus moves to the Close button or a result.
+  function onDialogKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") close();
+  }
+
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Escape") {
-      close();
-    } else if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIndex((i) => Math.min(i + 1, results.length - 1));
     } else if (e.key === "ArrowUp") {
@@ -194,6 +202,7 @@ export default function SearchPalette() {
           aria-modal="true"
           aria-label="Search documentation"
           onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}
+          onKeyDown={onDialogKeyDown}
           style={{
             position: "fixed",
             inset: 0,
@@ -240,7 +249,13 @@ export default function SearchPalette() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onInputKeyDown}
                 placeholder="Search by title, tag, or keyword…"
+                role="combobox"
+                aria-expanded={results.length > 0}
+                aria-controls={LISTBOX_ID}
+                aria-activedescendant={results.length > 0 ? optionId(activeIndex) : undefined}
+                aria-autocomplete="list"
                 aria-label="Search query"
+                autoComplete="off"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -272,14 +287,37 @@ export default function SearchPalette() {
               </button>
             </div>
 
-            <div ref={resultsRef} style={{ overflowY: "auto", flex: 1 }}>
+            <div ref={resultsRef} role="listbox" id={LISTBOX_ID} aria-label="Search results" style={{ overflowY: "auto", flex: 1 }}>
               {loading && (
                 <div style={{ padding: "1.25rem 1.1rem", fontFamily: "var(--font-sans)", fontSize: "0.8125rem", color: "var(--color-ink-40)" }}>
                   Searching…
                 </div>
               )}
 
-              {!loading && query.trim() && results.length === 0 && (
+              {!loading && error && (
+                <div style={{ padding: "1.25rem 1.1rem", fontFamily: "var(--font-sans)", fontSize: "0.8125rem", color: "var(--color-ink-90)" }}>
+                  Search is unavailable right now.
+                  <br />
+                  <button
+                    onClick={() => setRetryTick((t) => t + 1)}
+                    style={{
+                      marginTop: "0.5rem",
+                      background: "none",
+                      border: "1px solid var(--color-rule)",
+                      borderRadius: "2px",
+                      padding: "0.3rem 0.65rem",
+                      fontFamily: "var(--font-sans)",
+                      fontSize: "0.75rem",
+                      color: "var(--color-ink-70)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!loading && !error && query.trim() && results.length === 0 && (
                 <div style={{ padding: "1.25rem 1.1rem", fontFamily: "var(--font-sans)", fontSize: "0.8125rem", color: "var(--color-ink-40)" }}>
                   No pages match &ldquo;{query}&rdquo;
                 </div>
@@ -293,11 +331,13 @@ export default function SearchPalette() {
 
               {results.map((result, i) => {
                 const folder = result.path.includes("/") ? result.path.slice(0, result.path.lastIndexOf("/")) : "";
-                const snippet = snippetFor(result);
                 const active = i === activeIndex;
                 return (
                   <button
                     key={result.path}
+                    id={optionId(i)}
+                    role="option"
+                    aria-selected={active}
                     data-index={i}
                     onClick={() => goTo(result)}
                     onMouseEnter={() => setActiveIndex(i)}
@@ -338,7 +378,7 @@ export default function SearchPalette() {
                         {folder.split("/").map(prettyName).join(" / ")}
                       </div>
                     )}
-                    {snippet && (
+                    {result.snippet && (
                       <div
                         style={{
                           fontFamily: "var(--font-sans)",
@@ -352,7 +392,7 @@ export default function SearchPalette() {
                           WebkitBoxOrient: "vertical",
                         }}
                       >
-                        {highlightMatch(snippet, query)}
+                        {highlightMatch(result.snippet, query)}
                       </div>
                     )}
                   </button>
