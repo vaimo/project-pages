@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import BranchSwitcher from "./BranchSwitcher";
+import SearchPalette from "./SearchPalette";
 import SectionTabs from "./SectionTabs";
 
 interface TopNavProps {
@@ -85,6 +86,8 @@ export default function TopNav({ siteTitle, onMenuToggle, chatEnabled = false }:
       <div style={{ flex: 1 }} />
 
       {chatEnabled && <SectionTabs />}
+
+      <SearchPalette />
 
       <BranchSwitcher />
 

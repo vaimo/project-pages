@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { NavNode, NavFolder } from "@/lib/nav";
+import { prettyName, type NavNode, type NavFolder } from "@/lib/nav";
 
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 
@@ -11,21 +11,6 @@ function hasImageChildren(node: NavFolder): boolean {
   return node.children.some(
     (c) => c.type === "file" && IMAGE_EXTS.has(c.name.split(".").pop()?.toLowerCase() ?? "")
   );
-}
-
-/**
- * Turns a raw path segment ("returns_lifecycle.md" / "product-catalog" /
- * "ECOM_FRONTEND") into a human-readable label. Strips a trailing `.md`,
- * splits on `_`/`-`/`.`, then capitalises words that are entirely lowercase
- * so acronyms like `SAP`, `ECOM`, `FRONTEND` survive intact.
- */
-function prettyName(raw: string): string {
-  const noExt = raw.replace(/\.(md|mdx)$/i, "");
-  return noExt
-    .split(/[_\-.]+/)
-    .filter(Boolean)
-    .map((w) => (/[A-Z]/.test(w) ? w : w[0].toUpperCase() + w.slice(1)))
-    .join(" ");
 }
 
 const SIDEBAR_DEFAULT_WIDTH = 338;
