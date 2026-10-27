@@ -6,7 +6,12 @@ import remarkRehype from "remark-rehype";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
+import rehypeParse from "rehype-parse";
+import { unified } from "unified";
 import { visit } from "unist-util-visit";
+import mime from "mime";
+import { signRawAssetToken } from "./rawAssetToken";
+import { getRawFileBuffer } from "./github";
 import type { Comment } from "./supabase";
 
 export interface OutlineHeading { level: number; id: string; text: string; }
@@ -103,6 +108,214 @@ function rehypeRewriteImages(docFilePath: string) {
       node.properties.src = `/api/raw?path=${encodeURIComponent(repoRelative)}`;
     });
   };
+}
+
+// Media resources — hand-tested and confirmed to fetch successfully (200)
+// but never actually render in a sandboxed-without-allow-same-origin iframe,
+// the same way external scripts fetch but never execute. Inlined as data:
+// URIs instead, which sidesteps the restriction entirely (no edge case left
+// to hit, unlike a token URL that merely *should* work).
+const DATA_URI_ATTR_BY_TAG: Record<string, string[]> = {
+  img: ["src"],
+  source: ["src"],
+  audio: ["src"],
+  video: ["src", "poster"],
+};
+
+// Resources with no reasonable way to inline (a nested page, a plugin
+// object) stay on signed token URLs as a best effort — untested edge case,
+// but low-impact for these guide files, which don't appear to use them.
+const ASSET_ATTR_BY_TAG: Record<string, string[]> = {
+  iframe: ["src"],
+  embed: ["src"],
+  object: ["data"],
+};
+
+function isExternalOrSpecialUrl(url: string): boolean {
+  return (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("data:") ||
+    url.startsWith("mailto:") ||
+    url.startsWith("tel:") ||
+    url.startsWith("#") ||
+    url.startsWith("//") ||
+    url.startsWith("/")
+  );
+}
+
+function linkRel(node: any): string[] {
+  const rel = node.properties?.rel;
+  if (Array.isArray(rel)) return rel;
+  return rel ? [rel] : [];
+}
+
+const IMAGE_PATH_RE = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
+
+async function toDataUri(repoRelative: string, branch: string): Promise<string | null> {
+  try {
+    const { buffer } = await getRawFileBuffer(repoRelative, branch);
+    const type = mime.getType(repoRelative) ?? "application/octet-stream";
+    return `data:${type};base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Some guides embed their own structured data in a
+ * `<script type="application/json">` tag (screenshot paths, hotspot
+ * coordinates, etc.) that their own script reads and turns into DOM —
+ * relative image paths in there are invisible to the HTML-attribute rewrite
+ * pass above. Recursively rewrites any string value that looks like a
+ * relative image path, regardless of which key it's under, so this
+ * generalizes across guides without needing to know their JSON schema.
+ */
+async function rewriteImagePathsInJson(
+  value: unknown,
+  resolveRepoPath: (v: string) => string,
+  branch: string,
+): Promise<unknown> {
+  if (typeof value === "string") {
+    if (!IMAGE_PATH_RE.test(value) || isExternalOrSpecialUrl(value)) return value;
+    const dataUri = await toDataUri(resolveRepoPath(value), branch);
+    return dataUri ?? value;
+  }
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((v) => rewriteImagePathsInJson(v, resolveRepoPath, branch)));
+  }
+  if (value && typeof value === "object") {
+    const entries = await Promise.all(
+      Object.entries(value).map(async ([k, v]) => [k, await rewriteImagePathsInJson(v, resolveRepoPath, branch)] as const),
+    );
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
+/**
+ * Rehype plugin: prepares a standalone HTML file for sandboxed iframe
+ * embedding (no `allow-same-origin`, so the document has an opaque origin).
+ * Hand-testing against this exact setup (sandbox="allow-scripts ..." with no
+ * allow-same-origin) found that NEITHER external stylesheets NOR external
+ * scripts work there: a `<link rel="stylesheet">` blocks the document's
+ * render indefinitely, and a `<script src>` loads over the network (200 OK)
+ * but silently never executes. Inline `<style>`/`<script>` content works
+ * fine in both cases, so:
+ *
+ * - Same-repo `<link rel="stylesheet">` and `<script src>` tags are inlined
+ *   with their fetched file content instead of referencing a URL.
+ * - Media (img/source/audio/video) is hand-tested to fetch fine (200) but
+ *   never actually paint in this sandbox either — inlined as base64 `data:`
+ *   URIs, including relative image paths found inside a
+ *   `<script type="application/json">` data island (some guides render
+ *   themselves from inline JSON rather than plain HTML `<img>` tags).
+ * - Remaining relative asset URLs (iframe/embed/object, plus any
+ *   link/script that couldn't be inlined) fall back to signed
+ *   /api/raw?path=...&branch=...&token=... URLs — a token standing in for
+ *   the session cookie, which the iframe's opaque origin prevents the
+ *   browser from sending. Untested for this restriction; low-impact if it
+ *   turns out to apply here too, since these guides don't appear to use them.
+ */
+function rehypeRewriteAssetUrls(docFilePath: string, branch: string) {
+  return async (tree: any) => {
+    const docDir = docFilePath.includes("/")
+      ? docFilePath.slice(0, docFilePath.lastIndexOf("/"))
+      : "";
+    const resolveRepoPath = (value: string) => path.posix.resolve("/" + docDir, value).slice(1);
+
+    const inlineable: { node: any; url: string; as: "style" | "script" }[] = [];
+    visit(tree, "element", (node: any) => {
+      if (node.tagName === "link" && linkRel(node).includes("stylesheet")) {
+        const href: string = node.properties?.href ?? "";
+        if (href && !isExternalOrSpecialUrl(href)) inlineable.push({ node, url: href, as: "style" });
+      } else if (node.tagName === "script") {
+        const src: string = node.properties?.src ?? "";
+        if (src && !isExternalOrSpecialUrl(src)) inlineable.push({ node, url: src, as: "script" });
+      }
+    });
+
+    for (const { node, url, as } of inlineable) {
+      const repoRelative = resolveRepoPath(url);
+      try {
+        const { buffer } = await getRawFileBuffer(repoRelative, branch);
+        const text = buffer.toString("utf-8");
+        if (as === "style") {
+          node.tagName = "style";
+          node.properties = {};
+        } else {
+          delete node.properties.src;
+        }
+        node.children = [{ type: "text", value: text }];
+      } catch {
+        // Leave the original tag in place — the generic rewrite pass below
+        // will still point it at a (possibly non-functional) URL rather
+        // than silently dropping the reference.
+      }
+    }
+
+    const mediaNodes: { node: any; attr: string; value: string }[] = [];
+    visit(tree, "element", (node: any) => {
+      const attrs = DATA_URI_ATTR_BY_TAG[node.tagName];
+      if (!attrs) return;
+      for (const attr of attrs) {
+        const value: string = node.properties?.[attr] ?? "";
+        if (!value || isExternalOrSpecialUrl(value)) continue;
+        mediaNodes.push({ node, attr, value });
+      }
+    });
+    await Promise.all(
+      mediaNodes.map(async ({ node, attr, value }) => {
+        const dataUri = await toDataUri(resolveRepoPath(value), branch);
+        if (dataUri) node.properties[attr] = dataUri;
+      }),
+    );
+
+    visit(tree, "element", (node: any) => {
+      const attrs = ASSET_ATTR_BY_TAG[node.tagName];
+      if (!attrs) return;
+      for (const attr of attrs) {
+        const value: string = node.properties?.[attr] ?? "";
+        if (!value || isExternalOrSpecialUrl(value)) continue;
+
+        const repoRelative = resolveRepoPath(value);
+        const token = signRawAssetToken(repoRelative, branch);
+        node.properties[attr] =
+          `/api/raw?path=${encodeURIComponent(repoRelative)}&branch=${encodeURIComponent(branch)}&token=${token}`;
+      }
+    });
+
+    const jsonDataNodes: any[] = [];
+    visit(tree, "element", (node: any) => {
+      if (node.tagName === "script" && node.properties?.type === "application/json") jsonDataNodes.push(node);
+    });
+    for (const node of jsonDataNodes) {
+      const text = (node.children ?? []).map((c: any) => c.value ?? "").join("");
+      if (!text.trim()) continue;
+      try {
+        const data = JSON.parse(text);
+        const rewritten = await rewriteImagePathsInJson(data, resolveRepoPath, branch);
+        node.children = [{ type: "text", value: JSON.stringify(rewritten) }];
+      } catch {
+        // Not valid JSON — leave it untouched.
+      }
+    }
+  };
+}
+
+/**
+ * Renders a standalone HTML file (e.g. an interactive content guide checked
+ * into the docs repo) for sandboxed iframe embedding: parses it, rewrites
+ * relative asset URLs to signed /api/raw URLs, and stringifies it back out.
+ * Script/style content is left untouched — only tag attribute URLs are rewritten.
+ */
+export async function renderStandaloneHtml(raw: string, filePath: string, branch: string): Promise<string> {
+  const file = await unified()
+    .use(rehypeParse, { fragment: false })
+    .use(rehypeRewriteAssetUrls, filePath, branch)
+    .use(rehypeStringify, { allowDangerousHtml: true })
+    .process(raw);
+  return file.toString();
 }
 
 export interface RenderMarkdownOptions {

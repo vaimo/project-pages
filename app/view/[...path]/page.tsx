@@ -2,12 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { buildAuthOptions } from "@/lib/auth";
 import { getFilteredTree, getFileContent } from "@/lib/github";
-import { renderMarkdown, renderMarkdownWithFrontmatter, extractHeadings } from "@/lib/markdown";
+import { renderMarkdown, renderMarkdownWithFrontmatter, extractHeadings, renderStandaloneHtml } from "@/lib/markdown";
 import { convertDocxToHtml } from "@/lib/docx";
 import { parse as parseCsv } from "csv-parse/sync";
 import MarkdownView from "@/components/FileView/MarkdownView";
 import CsvView from "@/components/FileView/CsvView";
 import ImageView from "@/components/FileView/ImageView";
+import HtmlGuideView from "@/components/FileView/HtmlGuideView";
 import SubtitleView from "@/components/FileView/SubtitleView";
 import ExcalidrawView from "@/components/FileView/ExcalidrawView";
 import DownloadButton from "@/components/DownloadButton";
@@ -20,6 +21,7 @@ const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 const MD_EXTS = new Set(["md", "mdx"]);
 const DOCX_EXTS = new Set(["docx", "docm"]);
 const SUBTITLE_EXTS = new Set(["vtt", "srt"]);
+const HTML_EXTS = new Set(["html", "htm"]);
 
 export default async function ViewPage({ params }: Props) {
   const session = await getServerSession(await buildAuthOptions());
@@ -92,6 +94,11 @@ export default async function ViewPage({ params }: Props) {
   } else if (SUBTITLE_EXTS.has(ext)) {
     const raw = rawBuffer.toString("utf-8");
     content = <SubtitleView raw={raw} format={ext as "vtt" | "srt"} />;
+  } else if (HTML_EXTS.has(ext)) {
+    const raw = rawBuffer.toString("utf-8");
+    const html = await renderStandaloneHtml(raw, filePath, session.branchName);
+    showComments = false;
+    content = <HtmlGuideView html={html} title={fileName} />;
   } else if (IMAGE_EXTS.has(ext)) {
     content = (
       <ImageView
