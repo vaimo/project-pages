@@ -304,15 +304,48 @@ function rehypeRewriteAssetUrls(docFilePath: string, branch: string) {
 }
 
 /**
+ * Rehype plugin: makes a standalone HTML file's links open in the parent
+ * window. A srcDoc iframe has no URL of its own, so relative hrefs already
+ * resolve against the parent page (`index.html` → `/view/<dir>/index.html`).
+ * But a click navigates the sandboxed frame itself, where the app can't load,
+ * and the frame goes blank. A `<base target="_top">` sends every link to the
+ * parent window instead, including links a guide's script builds at runtime,
+ * which no server-side href rewrite would see. Links with their own `target`
+ * (e.g. `_blank`) keep it. Needs `allow-top-navigation-by-user-activation`
+ * on the iframe sandbox.
+ */
+function rehypeOpenLinksInParent() {
+  return (tree: any) => {
+    let head: any = null;
+    let base: any = null;
+    visit(tree, "element", (node: any) => {
+      if (node.tagName === "head" && !head) head = node;
+      if (node.tagName === "base" && !base) base = node;
+    });
+    if (base) {
+      if (!base.properties?.target) base.properties = { ...base.properties, target: "_top" };
+      return;
+    }
+    if (!head) return;
+    head.children = [
+      { type: "element", tagName: "base", properties: { target: "_top" }, children: [] },
+      ...(head.children ?? []),
+    ];
+  };
+}
+
+/**
  * Renders a standalone HTML file (e.g. an interactive content guide checked
  * into the docs repo) for sandboxed iframe embedding: parses it, rewrites
- * relative asset URLs to signed /api/raw URLs, and stringifies it back out.
+ * relative asset URLs to signed /api/raw URLs, points its links at the parent
+ * window, and stringifies it back out.
  * Script/style content is left untouched — only tag attribute URLs are rewritten.
  */
 export async function renderStandaloneHtml(raw: string, filePath: string, branch: string): Promise<string> {
   const file = await unified()
     .use(rehypeParse, { fragment: false })
     .use(rehypeRewriteAssetUrls, filePath, branch)
+    .use(rehypeOpenLinksInParent)
     .use(rehypeStringify, { allowDangerousHtml: true })
     .process(raw);
   return file.toString();
